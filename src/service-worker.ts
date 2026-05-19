@@ -17,7 +17,8 @@ const ASSETS = [
 self.addEventListener('install', ((event: ExtendableEvent) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) => {
-      return cache.addAll(ASSETS);
+      const uniqueAssets = Array.from(new Set(ASSETS));
+        return cache.addAll(uniqueAssets);
     })
   );
 }) as EventListener);
