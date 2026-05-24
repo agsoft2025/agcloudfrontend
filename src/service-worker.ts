@@ -1,65 +1,69 @@
 /// <reference lib="webworker" />
 /// <reference types="@sveltejs/kit" />
 
-import { build, files, prerendered } from '$service-worker';
+import { build, files, prerendered, version } from '$service-worker';
 
-const CACHE = 'agcloud-cache-v1';
+const worker = self as unknown as ServiceWorkerGlobalScope;
+const CACHE = `agcloud-cache-${version}`;
 
-const ASSETS = [
+const ASSETS = new Set([
   ...build,
   ...files,
   ...prerendered,
-  '/',
   '/manifest.webmanifest',
   '/favicon.svg'
-];
+]);
 
-self.addEventListener('install', ((event: ExtendableEvent) => {
+worker.addEventListener('install', (event) => {
+  worker.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE).then((cache) => {
-      const uniqueAssets = Array.from(new Set(ASSETS));
-        return cache.addAll(uniqueAssets);
+      return cache.addAll(ASSETS);
     })
   );
-}) as EventListener);
+});
 
-self.addEventListener('activate', ((event: ExtendableEvent) => {
+worker.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys
-          .filter((key) => key !== CACHE)
-          .map((key) => caches.delete(key))
-      );
-    })
+    caches
+      .keys()
+      .then((keys) => {
+        return Promise.all(
+          keys
+            .filter((key) => key !== CACHE)
+            .map((key) => caches.delete(key))
+        );
+      })
+      .then(() => worker.clients.claim())
   );
-}) as EventListener);
+});
 
-self.addEventListener('fetch', ((event: FetchEvent) => {
+worker.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== worker.location.origin) return;
+
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
+    (async () => {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+
+      const response = await fetch(event.request);
+
+      if (response.status === 200 && response.type === 'basic' && !response.redirected) {
+        const cache = await caches.open(CACHE);
+        await cache.put(event.request, response.clone());
       }
 
-      return fetch(event.request).then((response) => {
-        if (
-          event.request.method === 'GET' &&
-          response.status === 200
-        ) {
-          const responseClone = response.clone();
-
-          caches.open(CACHE).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
-        }
-
-        return response;
-      });
-    })
+      return response;
+    })()
   );
-}) as EventListener);
+});

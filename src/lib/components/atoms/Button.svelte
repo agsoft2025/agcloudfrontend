@@ -23,7 +23,6 @@
   {type}
   disabled={isDisabled}
   aria-disabled={isDisabled}
-  aria-busy={loading}
   aria-label={ariaLabel}
   on:click
   on:focus

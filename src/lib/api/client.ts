@@ -1,7 +1,16 @@
+import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
+import { authStore } from '$lib/stores/auth.store';
+
 export type AccessToken = string | null | undefined;
 
 export interface RefreshResult {
   accessToken: string;
+}
+
+export interface ApiErrorDetails {
+  status: number;
+  statusText: string;
+  body?: unknown;
 }
 
 export interface ApiClientOptions {
@@ -14,31 +23,42 @@ export interface ApiClientOptions {
   clearTokens?: () => void | Promise<void>;
 }
 
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
 const DEFAULT_REFRESH_PATH = '/auth/refresh';
+export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-function hasBrowserStorage() {
-  return typeof localStorage !== 'undefined';
+export class ApiError extends Error {
+  status: number;
+  statusText: string;
+  body?: unknown;
+
+  constructor(message: string, details: ApiErrorDetails) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = details.status;
+    this.statusText = details.statusText;
+    this.body = details.body;
+  }
 }
 
-function readStoredToken(key: string) {
-  if (!hasBrowserStorage()) return null;
-  return localStorage.getItem(key);
-}
+export const axiosClient = axios.create({
+  baseURL: DEFAULT_BASE_URL,
+  withCredentials: true,
+  headers: {
+    Accept: 'application/json'
+  }
+});
 
-function writeStoredToken(key: string, token: string) {
-  if (!hasBrowserStorage()) return;
-  localStorage.setItem(key, token);
-}
+axiosClient.interceptors.request.use((config) => {
+  const accessToken = authStore.getAccessToken();
 
-function clearStoredTokens() {
-  if (!hasBrowserStorage()) return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
+  if (accessToken) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`);
+  }
 
-function joinUrl(baseUrl: string | undefined, input: RequestInfo | URL) {
+  return config;
+});
+
+export function joinUrl(baseUrl: string | undefined, input: RequestInfo | URL) {
   if (input instanceof Request) return input.url;
   if (input instanceof URL) return input.toString();
 
@@ -72,13 +92,13 @@ function parseRefreshResponse(data: unknown): RefreshResult {
 }
 
 export function createApiClient(options: ApiClientOptions = {}) {
-  const baseUrl = options.baseUrl;
+  const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
   const refreshPath = options.refreshPath ?? DEFAULT_REFRESH_PATH;
   const fetcher = options.fetch ?? fetch;
-  const getAccessToken = options.getAccessToken ?? (() => readStoredToken(ACCESS_TOKEN_KEY));
-  const getRefreshToken = options.getRefreshToken ?? (() => readStoredToken(REFRESH_TOKEN_KEY));
-  const setAccessToken = options.setAccessToken ?? ((token: string) => writeStoredToken(ACCESS_TOKEN_KEY, token));
-  const clearTokens = options.clearTokens ?? clearStoredTokens;
+  const getAccessToken = options.getAccessToken ?? (() => authStore.getAccessToken());
+  const getRefreshToken = options.getRefreshToken ?? (() => authStore.getRefreshToken());
+  const setAccessToken = options.setAccessToken ?? ((token: string) => authStore.setAccessToken(token));
+  const clearTokens = options.clearTokens ?? (() => authStore.clear());
 
   let refreshPromise: Promise<string> | null = null;
 
@@ -190,4 +210,40 @@ export function createApiClient(options: ApiClientOptions = {}) {
 }
 
 export const apiClient = createApiClient();
+
+type RetriableAxiosRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+axiosClient.interceptors.response.use(
+  (response) => response,
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error) || !error.response || !error.config) {
+      throw error;
+    }
+
+    const originalRequest = error.config as RetriableAxiosRequestConfig;
+
+    if (
+      error.response.status !== 401 ||
+      originalRequest._retry ||
+      isRefreshRequest(originalRequest.url ?? '', DEFAULT_REFRESH_PATH)
+    ) {
+      throw error;
+    }
+
+    originalRequest._retry = true;
+
+    try {
+      const accessToken = await apiClient.refreshAccessToken();
+      originalRequest.headers = AxiosHeaders.from(originalRequest.headers);
+      originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
+
+      return axiosClient(originalRequest);
+    } catch {
+      throw error;
+    }
+  }
+);
+
 export const apiFetch = apiClient.fetch;
