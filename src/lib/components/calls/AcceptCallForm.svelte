@@ -129,14 +129,12 @@
   }
 
   .actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
   }
 
-  @media (max-width: 640px) {
-    .actions {
-      grid-template-columns: 1fr;
-    }
+  .actions :global(.button) {
+    flex: 1 1 120px;
   }
 </style>

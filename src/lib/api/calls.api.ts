@@ -4,8 +4,11 @@ import { axiosClient } from './client';
 export type CallType = 'audio' | 'video';
 
 export interface InitiateCallPayload {
-  calleeId: string;
+  calleeId?: string; // backward compatibility
+  receiverIds?: string[];
   callType: CallType;
+  callMode: 'one-to-one' | 'conference';
+  recording?: boolean;
 }
 
 export interface CallSummary {
@@ -13,6 +16,10 @@ export interface CallSummary {
   _id?: string;
   callerId?: string;
   calleeId?: string;
+  receiverIds?: string[];
+  callMode?: 'one-to-one' | 'conference';
+  roomId?: string;
+  recording?: boolean;
   callType?: CallType;
   status?: string;
   createdAt?: string;
@@ -105,4 +112,14 @@ export function getCallApiErrorMessage(error: unknown, fallback = 'The call requ
   }
 
   return fallback;
+}
+
+export async function startRecording(callId: string) {
+  const response = await axiosClient.post<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/start`);
+  return response.data;
+}
+
+export async function stopRecording(callId: string) {
+  const response = await axiosClient.post<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/stop`);
+  return response.data;
 }

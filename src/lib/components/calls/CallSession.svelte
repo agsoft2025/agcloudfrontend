@@ -14,8 +14,109 @@
   import { ConnectionState, Track } from 'livekit-client';
   import { callStore } from '$lib/stores/call.store';
   import LiveKitTrack from './LiveKitTrack.svelte';
+  import { onDestroy } from 'svelte';
 
   export let session: ActiveCallSession;
+
+  let mediaRecorder: MediaRecorder | null = null;
+  let recordedChunks: Blob[] = [];
+  let isRecordingCall = false;
+  let recordingTime = 0;
+  let recordingInterval: any;
+
+  onDestroy(() => {
+    if (isRecordingCall) {
+      stopRecordingMedia();
+    }
+  });
+
+  function startRecordingMedia() {
+    recordedChunks = [];
+    const tracksToRecord: MediaStreamTrack[] = [];
+
+    const localAudioTrack = $callStore.localParticipant?.tracks.find(
+      (item) => item.kind === Track.Kind.Audio && item.track
+    )?.track?.mediaStreamTrack;
+    if (localAudioTrack) tracksToRecord.push(localAudioTrack);
+
+    if (localVideoTrack?.mediaStreamTrack) {
+      tracksToRecord.push(localVideoTrack.mediaStreamTrack);
+    }
+
+    $callStore.remoteParticipants.forEach((p) => {
+      p.tracks.forEach((pub) => {
+        if (pub.track?.mediaStreamTrack) {
+          tracksToRecord.push(pub.track.mediaStreamTrack);
+        }
+      });
+    });
+
+    if (tracksToRecord.length === 0) {
+      alert("No active media tracks found to record.");
+      return;
+    }
+
+    const stream = new MediaStream(tracksToRecord);
+    try {
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    } catch (e) {
+      mediaRecorder = new MediaRecorder(stream);
+    }
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `agcloud-call-${session.callId || 'session'}-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    };
+
+    mediaRecorder.start();
+    isRecordingCall = true;
+    recordingTime = 0;
+    recordingInterval = setInterval(() => {
+      recordingTime += 1;
+    }, 1000);
+
+    if (session.callId) {
+      import('$lib/api/calls.api').then(({ startRecording }) => {
+        startRecording(session.callId!).catch(console.error);
+      });
+    }
+  }
+
+  function stopRecordingMedia() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    isRecordingCall = false;
+    clearInterval(recordingInterval);
+
+    if (session.callId) {
+      import('$lib/api/calls.api').then(({ stopRecording }) => {
+        stopRecording(session.callId!).catch(console.error);
+      });
+    }
+  }
+
+  function formatTime(seconds: number) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
 
   $: localVideoTrack = $callStore.localParticipant?.tracks.find(
     (item) => item.kind === Track.Kind.Video && item.track
@@ -52,15 +153,42 @@
   <div class="session-header">
     <div>
       <p class="eyebrow">Call in progress</p>
-      <h3 id="active-call-title">Waiting for response</h3>
+      <h3 id="active-call-title">{isConnected ? 'Active Call' : 'Waiting for response'}</h3>
       <p class="connection-state">
         {$callStore.connectionState}
         {#if session.roomName}
           <span>Room {session.roomName}</span>
         {/if}
       </p>
+      {#if isRecordingCall}
+        <div class="recording-badge" aria-live="polite">
+          <span class="recording-dot"></span>
+          <span>Recording: {formatTime(recordingTime)}</span>
+        </div>
+      {/if}
     </div>
-    <slot name="actions" />
+    <div class="header-actions">
+      {#if isConnected}
+        {#if !isRecordingCall}
+          <button class="rec-btn" on:click={startRecordingMedia}>
+            <svg class="rec-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" stroke-width="2"/>
+              <circle cx="12" cy="12" r="4" fill="currentColor"/>
+            </svg>
+            <span>Record Call</span>
+          </button>
+        {:else}
+          <button class="rec-btn is-recording" on:click={stopRecordingMedia}>
+            <svg class="rec-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" stroke-width="2"/>
+              <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+            </svg>
+            <span>Stop Rec</span>
+          </button>
+        {/if}
+      {/if}
+      <slot name="actions" />
+    </div>
   </div>
 
   <div class="stage">
@@ -320,8 +448,78 @@
     }
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .recording-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-block-start: var(--space-xs);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, #b42318 10%, transparent);
+    color: #b42318;
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .recording-dot {
+    inline-size: 0.55rem;
+    block-size: 0.55rem;
+    border-radius: 999px;
+    background: #b42318;
+    box-shadow: 0 0 0 0 rgb(180 35 24 / 56%);
+    animation: pulse-red 1.5s ease-out infinite;
+  }
+
+  @keyframes pulse-red {
+    70% {
+      box-shadow: 0 0 0 0.4rem rgb(180 35 24 / 0%);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgb(180 35 24 / 0%);
+    }
+  }
+
+  .rec-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    transition: all 160ms ease;
+  }
+
+  .rec-btn:hover {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  }
+
+  .rec-btn.is-recording {
+    border-color: #b42318;
+    background: color-mix(in srgb, #b42318 8%, transparent);
+    color: #b42318;
+  }
+
+  .rec-icon {
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+  }
+
   @media (max-width: 560px) {
     .session-header,
+    .header-actions,
     .panel-footer {
       align-items: stretch;
       flex-direction: column;

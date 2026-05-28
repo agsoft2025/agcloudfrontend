@@ -27,6 +27,8 @@
 
   let calleeId = DEFAULT_CALLEE_ID;
   let callType: CallType = 'video';
+  let callMode: 'one-to-one' | 'conference' = 'one-to-one';
+  let isRecording = false;
   let fieldError = '';
   let statusMessage = '';
   let statusVariant: CallStatusVariant = 'info';
@@ -58,11 +60,22 @@
     const trimmedCalleeId = calleeId.trim();
 
     if (!trimmedCalleeId) {
-      fieldError = 'Callee ID is required.';
+      fieldError = 'Recipient ID is required.';
       return null;
     }
 
-    return trimmedCalleeId;
+    const ids = trimmedCalleeId.split(',').map((id) => id.trim()).filter(Boolean);
+    if (ids.length === 0) {
+      fieldError = 'At least one recipient ID is required.';
+      return null;
+    }
+
+    if (callMode === 'one-to-one' && ids.length > 1) {
+      fieldError = 'Only one recipient ID is allowed for One-to-One calls. Switch to Conference mode for multiple.';
+      return null;
+    }
+
+    return ids;
   }
 
   async function connectLiveKit(
@@ -161,16 +174,21 @@
     fieldError = '';
     statusMessage = '';
 
-    const validatedCalleeId = validateCalleeId();
+    const validatedReceiverIds = validateCalleeId();
 
-    if (!validatedCalleeId) {
+    if (!validatedReceiverIds) {
       return;
     }
 
     isSubmitting = true;
 
     try {
-      const response = await initiateCall({ calleeId: validatedCalleeId, callType });
+      const response = await initiateCall({
+        receiverIds: validatedReceiverIds,
+        callType,
+        callMode,
+        recording: isRecording
+      });
       const callId = getCallIdentifier(response);
       let liveKitSession: { roomName: string; callType: CallType } | null = null;
       let liveKitError = '';
@@ -187,15 +205,15 @@
       activeSession = {
         callId,
         callType: liveKitSession?.callType ?? callType,
-        recipients: [validatedCalleeId],
+        recipients: validatedReceiverIds,
         initiatedAt: new Date(),
-        roomName: liveKitSession?.roomName
+        roomName: liveKitSession?.roomName ?? response.roomName
       };
 
       if (liveKitError) {
         setStatus(liveKitError, 'error');
       } else {
-        setStatus(`Call request sent to ${validatedCalleeId}.`, 'success');
+        setStatus(`Call request sent to ${validatedReceiverIds.join(', ')}.`, 'success');
       }
     } catch (apiError) {
       setStatus(getCallApiErrorMessage(apiError, 'Unable to initiate the call.'), 'error');
@@ -298,13 +316,21 @@
       </div>
 
       <form class="form" on:submit|preventDefault={handleInitiateCall} novalidate>
+        <label class="field" for="call-mode">
+          <span>Call mode</span>
+          <select id="call-mode" bind:value={callMode} disabled={isSubmitting}>
+            <option value="one-to-one">One-to-One Call</option>
+            <option value="conference">Conference Call</option>
+          </select>
+        </label>
+
         <Input
           id="callee-id"
           name="calleeId"
-          label="Callee ID"
+          label={callMode === 'one-to-one' ? 'Callee User ID' : 'Callee User IDs (comma-separated)'}
           bind:value={calleeId}
           error={fieldError}
-          placeholder="0000"
+          placeholder={callMode === 'one-to-one' ? 'e.g. 1001' : 'e.g. 1001, 1002, 1003'}
           disabled={isSubmitting}
           required
           on:input={() => {
@@ -320,6 +346,13 @@
             <option value="audio">Audio</option>
           </select>
         </label>
+
+        <div class="recording-row">
+          <label class="recording-label">
+            <input type="checkbox" bind:checked={isRecording} disabled={isSubmitting} />
+            <span>Enable Call Recording</span>
+          </label>
+        </div>
 
         <Button type="submit" size="lg" loading={isSubmitting}>Initiate call</Button>
       </form>
@@ -612,6 +645,30 @@
     color: var(--color-text);
     font-size: 0.925rem;
     font-weight: 700;
+  }
+
+  .recording-row {
+    display: flex;
+    align-items: center;
+    padding: var(--space-xs) 0;
+  }
+
+  .recording-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .recording-label input {
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
   }
 
   select {
