@@ -12,17 +12,25 @@
 
 <script lang="ts">
   import { ConnectionState, Track } from 'livekit-client';
+  import { createEventDispatcher } from 'svelte';
   import { callStore } from '$lib/stores/call.store';
+  import { liveKitClient } from '$lib/livekit/LiveKitClient';
   import LiveKitTrack from './LiveKitTrack.svelte';
   import { onDestroy } from 'svelte';
 
   export let session: ActiveCallSession;
+  export let isEndingCall = false;
+
+  const dispatch = createEventDispatcher<{ endCall: void }>();
 
   let mediaRecorder: MediaRecorder | null = null;
   let recordedChunks: Blob[] = [];
   let isRecordingCall = false;
   let recordingTime = 0;
   let recordingInterval: any;
+  let isTogglingAudio = false;
+  let isTogglingVideo = false;
+  let controlError = '';
 
   onDestroy(() => {
     if (isRecordingCall) {
@@ -118,12 +126,83 @@
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  async function toggleMicrophone() {
+    if (isTogglingAudio || !isConnected) return;
+
+    isTogglingAudio = true;
+    controlError = '';
+
+    try {
+      await liveKitClient.setMicrophoneEnabled(!isMicrophoneEnabled);
+      if ($callStore.room) {
+        callStore.syncRoom($callStore.room);
+      }
+    } catch (error) {
+      controlError = getMediaControlError(error, 'microphone');
+    } finally {
+      isTogglingAudio = false;
+    }
+  }
+
+  async function toggleCamera() {
+    if (isTogglingVideo || !isConnected) return;
+
+    isTogglingVideo = true;
+    controlError = '';
+
+    try {
+      const publication = await liveKitClient.setCameraEnabled(!isCameraEnabled);
+      if (!publication && !isCameraEnabled) {
+        controlError = 'Camera unavailable. Check browser permissions or close other apps using the camera.';
+      }
+      if ($callStore.room) {
+        callStore.syncRoom($callStore.room);
+      }
+    } catch (error) {
+      controlError = getMediaControlError(error, 'camera');
+    } finally {
+      isTogglingVideo = false;
+    }
+  }
+
+  function getMediaControlError(error: unknown, device: 'microphone' | 'camera') {
+    if (error instanceof DOMException) {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        return `${capitalize(device)} permission was denied. Allow access in the browser and try again.`;
+      }
+
+      if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        return `No ${device} device was found.`;
+      }
+
+      if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+        return `The ${device} is already in use or unavailable.`;
+      }
+    }
+
+    return error instanceof Error && error.message.length > 0
+      ? error.message
+      : `Unable to update ${device}.`;
+  }
+
+  function capitalize(value: string) {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
   $: localVideoTrack = $callStore.localParticipant?.tracks.find(
-    (item) => item.kind === Track.Kind.Video && item.track
+    (item) => item.kind === Track.Kind.Video && item.track && !item.isMuted
   )?.track;
+  $: localAudioPublication = $callStore.localParticipant?.tracks.find(
+    (item) => item.kind === Track.Kind.Audio && item.source === Track.Source.Microphone
+  );
+  $: localVideoPublication = $callStore.localParticipant?.tracks.find(
+    (item) => item.kind === Track.Kind.Video && item.source === Track.Source.Camera
+  );
+  $: isMicrophoneEnabled = Boolean(localAudioPublication && !localAudioPublication.isMuted);
+  $: isCameraEnabled = Boolean(localVideoPublication && !localVideoPublication.isMuted && localVideoPublication.track);
   $: remoteVideoTracks = $callStore.remoteParticipants.flatMap((participant) =>
     participant.tracks
-      .filter((item) => item.kind === Track.Kind.Video && item.track)
+      .filter((item) => item.kind === Track.Kind.Video && item.track && !item.isMuted)
       .map((item) => ({
         id: item.sid,
         participant: participant.name ?? participant.identity,
@@ -144,6 +223,22 @@
         track: item.track
       }))
   );
+  $: remoteParticipantStates = $callStore.remoteParticipants.map((participant) => {
+    const name = participant.name ?? participant.identity;
+    const audioPublication = participant.tracks.find(
+      (item) => item.kind === Track.Kind.Audio && item.source === Track.Source.Microphone
+    );
+    const videoPublication = participant.tracks.find(
+      (item) => item.kind === Track.Kind.Video && item.source === Track.Source.Camera
+    );
+
+    return {
+      id: participant.sid || participant.identity,
+      name,
+      isMicrophoneMuted: Boolean(audioPublication?.isMuted),
+      isCameraOff: !videoPublication || videoPublication.isMuted || !videoPublication.track
+    };
+  });
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
   $: participantCount = $callStore.remoteParticipants.length;
   $: remoteTrackCount = remoteVideoTracks.length + remoteAudioTracks.length;
@@ -198,13 +293,13 @@
           <LiveKitTrack track={localVideoTrack} label="Your video preview" muted mirror />
         {:else}
           <div class="empty-media">
-            <strong>{session.callType === 'video' ? 'Starting your camera' : 'Audio connected'}</strong>
-            <span>{isConnected ? 'Publishing local media...' : 'Connecting to room...'}</span>
+            <strong>{isConnected && !isCameraEnabled ? 'Camera off' : session.callType === 'video' ? 'Starting your camera' : 'Audio connected'}</strong>
+            <span>{isConnected ? (isCameraEnabled ? 'Publishing local media...' : 'Your video is not being sent.') : 'Connecting to room...'}</span>
           </div>
         {/if}
       </div>
       <div class="panel-footer">
-        <span>Your {session.callType} preview</span>
+        <span>{isMicrophoneEnabled ? 'Microphone on' : 'Microphone muted'} · {isCameraEnabled ? 'Camera on' : 'Camera off'}</span>
         {#if session.callId}
           <strong>{session.callId}</strong>
         {/if}
@@ -222,6 +317,18 @@
             <div class="media-tile">
               <LiveKitTrack track={item.track} label={`${item.participant} video`} />
               <span class="participant-name">{item.participant}</span>
+              {#each remoteParticipantStates.filter((state) => state.name === item.participant) as state (state.id)}
+                {#if state.isMicrophoneMuted || state.isCameraOff}
+                  <div class="remote-indicators" aria-live="polite">
+                    {#if state.isMicrophoneMuted}
+                      <span>Microphone muted</span>
+                    {/if}
+                    {#if state.isCameraOff}
+                      <span>Camera off</span>
+                    {/if}
+                  </div>
+                {/if}
+              {/each}
             </div>
           {/each}
         </div>
@@ -239,13 +346,104 @@
             Remote participants: {participantCount}. Remote tracks: {remoteTrackCount}.
           </p>
           <div class="recipient-list" aria-label="Waiting recipients">
-            {#each session.recipients as recipient}
-              <span>{recipient}</span>
+            {#each remoteParticipantStates.length > 0 ? remoteParticipantStates : session.recipients.map((recipient) => ({ id: recipient, name: recipient, isMicrophoneMuted: false, isCameraOff: false })) as participant}
+              <span>{participant.name}</span>
             {/each}
           </div>
+          {#if remoteParticipantStates.some((state) => state.isMicrophoneMuted || state.isCameraOff)}
+            <div class="state-list" aria-live="polite">
+              {#each remoteParticipantStates as state (state.id)}
+                {#if state.isMicrophoneMuted}
+                  <span>{state.name}: Microphone muted</span>
+                {/if}
+                {#if state.isCameraOff}
+                  <span>{state.name}: Camera off</span>
+                {/if}
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </article>
+  </div>
+
+  {#if controlError}
+    <p class="control-error" role="alert">{controlError}</p>
+  {/if}
+
+  <div class="call-controls" aria-label="Call controls">
+    <button
+      type="button"
+      class:active={!isMicrophoneEnabled}
+      disabled={!isConnected || isTogglingAudio}
+      aria-pressed={!isMicrophoneEnabled}
+      aria-label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+      on:click={toggleMicrophone}
+    >
+      <span class="control-icon" aria-hidden="true">
+        {#if isMicrophoneEnabled}
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z" />
+            <path d="M19 11a7 7 0 0 1-14 0" />
+            <path d="M12 18v4" />
+            <path d="M8 22h8" />
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 14a3 3 0 0 0 3-3V9" />
+            <path d="M9 9v2a3 3 0 0 0 4.6 2.5" />
+            <path d="M19 11a7 7 0 0 1-10.4 6.1" />
+            <path d="M5 11a7 7 0 0 0 7 7" />
+            <path d="M12 18v4" />
+            <path d="M8 22h8" />
+            <path d="M4 4l16 16" />
+          </svg>
+        {/if}
+      </span>
+      <span>{isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
+    </button>
+
+    <button
+      type="button"
+      class:active={!isCameraEnabled}
+      disabled={!isConnected || isTogglingVideo}
+      aria-pressed={!isCameraEnabled}
+      aria-label={isCameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+      on:click={toggleCamera}
+    >
+      <span class="control-icon" aria-hidden="true">
+        {#if isCameraEnabled}
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M15 10l5-3v10l-5-3" />
+            <path d="M4 6h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" />
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M10.7 6H13a2 2 0 0 1 2 2v2.3" />
+            <path d="M15 14l5 3V7l-3.2 1.9" />
+            <path d="M2 8a2 2 0 0 1 2-2h2" />
+            <path d="M2 12v4a2 2 0 0 0 2 2h9a2 2 0 0 0 1.1-.3" />
+            <path d="M4 4l16 16" />
+          </svg>
+        {/if}
+      </span>
+      <span>{isCameraEnabled ? 'Video off' : 'Video on'}</span>
+    </button>
+
+    <button
+      type="button"
+      class="end-control"
+      aria-label="End call"
+      disabled={isEndingCall}
+      on:click={() => dispatch('endCall')}
+    >
+      <span class="control-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z" />
+        </svg>
+      </span>
+      <span>End call</span>
+    </button>
   </div>
 </section>
 
@@ -432,6 +630,122 @@
     padding: 0.35rem 0.65rem;
   }
 
+  .state-list,
+  .remote-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-xs);
+  }
+
+  .state-list span,
+  .remote-indicators span {
+    border-radius: 999px;
+    background: rgb(16 24 32 / 78%);
+    color: var(--color-surface);
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 0.28rem 0.58rem;
+  }
+
+  .remote-indicators {
+    position: absolute;
+    inset-block-start: var(--space-md);
+    inset-inline-start: var(--space-md);
+    justify-content: flex-start;
+  }
+
+  .control-error {
+    margin: 0;
+    border: 1px solid color-mix(in srgb, #b42318 28%, var(--color-border));
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, #b42318 7%, var(--color-surface));
+    color: #b42318;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 0.65rem 0.8rem;
+  }
+
+  .call-controls {
+    position: sticky;
+    inset-block-end: var(--space-md);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-md);
+    border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 88%);
+    padding: var(--space-md);
+    box-shadow: 0 0.75rem 2rem rgb(23 32 38 / 12%);
+    backdrop-filter: blur(12px);
+    z-index: 2;
+  }
+
+  .call-controls button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-inline-size: 8.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    font-weight: 800;
+    min-block-size: 3rem;
+    padding: 0.65rem 0.9rem;
+    cursor: pointer;
+    transition:
+      background 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .call-controls button:hover:not(:disabled) {
+    border-color: var(--color-secondary);
+    transform: translateY(-1px);
+  }
+
+  .call-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .call-controls button.active {
+    border-color: color-mix(in srgb, #b42318 38%, var(--color-border));
+    background: color-mix(in srgb, #b42318 8%, var(--color-surface));
+    color: #b42318;
+  }
+
+  .call-controls .end-control {
+    border-color: #b42318;
+    background: #b42318;
+    color: var(--color-surface);
+  }
+
+  .control-icon {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1.6rem;
+    block-size: 1.6rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  .control-icon svg {
+    inline-size: 1.05rem;
+    block-size: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
   @keyframes pulse {
     70% {
       box-shadow: 0 0 0 1.5rem color-mix(in srgb, var(--color-secondary) 0%, transparent);
@@ -520,9 +834,14 @@
   @media (max-width: 560px) {
     .session-header,
     .header-actions,
-    .panel-footer {
+    .panel-footer,
+    .call-controls {
       align-items: stretch;
       flex-direction: column;
+    }
+
+    .call-controls button {
+      inline-size: 100%;
     }
   }
 </style>

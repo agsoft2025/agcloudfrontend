@@ -285,19 +285,7 @@
   </div>
 
   {#if activeSession}
-    <CallSession session={activeSession}>
-      <svelte:fragment slot="actions">
-        <Button
-          type="button"
-          variant="danger"
-          ariaLabel="End active call"
-          loading={isEndingCall}
-          on:click={handleEndActiveCall}
-        >
-          End call
-        </Button>
-      </svelte:fragment>
-    </CallSession>
+    <CallSession session={activeSession} {isEndingCall} on:endCall={handleEndActiveCall} />
   {/if}
 
   <div class="content-grid">
