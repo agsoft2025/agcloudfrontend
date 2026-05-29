@@ -24,6 +24,7 @@
   import AcceptCallForm from './AcceptCallForm.svelte';
   import CallSession, { type ActiveCallSession } from './CallSession.svelte';
   import CallStatus, { type CallStatusVariant } from './CallStatus.svelte';
+  import CallTypeToggle from './CallTypeToggle.svelte';
 
   let calleeId = DEFAULT_CALLEE_ID;
   let callType: CallType = 'video';
@@ -35,7 +36,6 @@
   let isSubmitting = false;
   let isEndingCall = false;
   let activeSession: ActiveCallSession | null = null;
-  // Flag to indicate whether we have a local video track
   let videoAvailable = true;
   let cleanupCallEvents: (() => void) | null = null;
 
@@ -52,29 +52,24 @@
     if (error instanceof Error && error.message.length > 0) {
       return `${fallback} ${error.message}`;
     }
-
     return fallback;
   }
 
   function validateCalleeId() {
     const trimmedCalleeId = calleeId.trim();
-
     if (!trimmedCalleeId) {
       fieldError = 'Recipient ID is required.';
       return null;
     }
-
     const ids = trimmedCalleeId.split(',').map((id) => id.trim()).filter(Boolean);
     if (ids.length === 0) {
       fieldError = 'At least one recipient ID is required.';
       return null;
     }
-
     if (callMode === 'one-to-one' && ids.length > 1) {
       fieldError = 'Only one recipient ID is allowed for One-to-One calls. Switch to Conference mode for multiple.';
       return null;
     }
-
     return ids;
   }
 
@@ -82,62 +77,33 @@
     response: InitiateCallResponse | AcceptCallResponse,
     fallbackCallType: CallType
   ): Promise<{ roomName: string; callType: CallType } | null> {
-    if (!hasLiveKitCredentials(response)) {
-      return null;
-    }
-
+    if (!hasLiveKitCredentials(response)) return null;
     cleanupCallEvents?.();
     cleanupCallEvents = null;
-
     const requestedVideo = (response.call?.callType ?? fallbackCallType) === 'video';
     const room = await liveKitClient.connect({
       token: response.token,
       url: response.url,
-      roomOptions: {
-        adaptiveStream: false,
-        dynacast: false
-      },
-      connectOptions: {
-        autoSubscribe: true
-      }
+      roomOptions: { adaptiveStream: false, dynacast: false },
+      connectOptions: { autoSubscribe: true }
     });
-
     cleanupCallEvents = bindCallEvents(room);
-    // Ensure we are subscribed to all remote tracks after connecting
     liveKitClient.subscribeToAllRemoteTracks();
-
     const publishResults = await Promise.allSettled([
       liveKitClient.setMicrophoneEnabled(true),
       requestedVideo ? liveKitClient.setCameraEnabled(true) : Promise.resolve(undefined)
     ]);
-
     publishResults.forEach((result) => {
-      if (result.status === 'rejected') {
-        console.warn('LiveKit media publishing failed.', result.reason);
-      }
+      if (result.status === 'rejected') console.warn('LiveKit media publishing failed.', result.reason);
     });
-
-    // Log local tracks for debugging and detect video availability
     const localTracks = room.localParticipant.getTrackPublications();
     videoAvailable = localTracks.some((t) => t.kind === Track.Kind.Video);
-    // Log remote tracks for debugging
     room.remoteParticipants.forEach((p) => {
       const remoteTracks = p.getTrackPublications();
-      console.log(
-        'Remote participant',
-        p.identity,
-        'tracks:',
-        remoteTracks.map((t) => t.kind + ':' + t.source)
-      );
+      console.log('Remote participant', p.identity, 'tracks:', remoteTracks.map((t) => t.kind + ':' + t.source));
     });
-
-    // Ensure we use the same roomName for both users
     const finalRoomName = response.roomName || `room-${Date.now()}`;
-
-    return {
-      roomName: finalRoomName,
-      callType: requestedVideo && videoAvailable ? 'video' : 'audio'
-    };
+    return { roomName: finalRoomName, callType: requestedVideo && videoAvailable ? 'video' : 'audio' };
   }
 
   async function cleanupLiveKit() {
@@ -151,12 +117,10 @@
 
   async function handleAcceptedCall(event: CustomEvent<AcceptCallResponse & { requestedCallId: string }>) {
     statusMessage = '';
-
     try {
       const response = event.detail;
       const liveKitSession = await connectLiveKit(response, response.call?.callType ?? 'video');
       const callId = getCallIdentifier(response) ?? response.requestedCallId;
-
       activeSession = {
         callId,
         callType: liveKitSession?.callType ?? response.call?.callType ?? 'video',
@@ -173,35 +137,19 @@
   async function handleInitiateCall() {
     fieldError = '';
     statusMessage = '';
-
     const validatedReceiverIds = validateCalleeId();
-
-    if (!validatedReceiverIds) {
-      return;
-    }
-
+    if (!validatedReceiverIds) return;
     isSubmitting = true;
-
     try {
-      const response = await initiateCall({
-        receiverIds: validatedReceiverIds,
-        callType,
-        callMode,
-        recording: isRecording
-      });
+      const response = await initiateCall({ receiverIds: validatedReceiverIds, callType, callMode, recording: isRecording });
       const callId = getCallIdentifier(response);
       let liveKitSession: { roomName: string; callType: CallType } | null = null;
       let liveKitError = '';
-
       try {
         liveKitSession = await connectLiveKit(response, callType);
       } catch (error) {
-        liveKitError = getErrorMessage(
-          error,
-          'Call initiated, but LiveKit could not connect. Check the LiveKit URL and token.'
-        );
+        liveKitError = getErrorMessage(error, 'Call initiated, but LiveKit could not connect. Check the LiveKit URL and token.');
       }
-
       activeSession = {
         callId,
         callType: liveKitSession?.callType ?? callType,
@@ -209,7 +157,6 @@
         initiatedAt: new Date(),
         roomName: liveKitSession?.roomName ?? response.roomName
       };
-
       if (liveKitError) {
         setStatus(liveKitError, 'error');
       } else {
@@ -223,16 +170,13 @@
   }
 
   async function retryVideo() {
-    // Attempt to enable the camera again after the device is freed
     try {
       const pub = await liveKitClient.setCameraEnabled(true);
       if (pub) {
         videoAvailable = true;
         setStatus('Video re-enabled.', 'success');
-        // Re-subscribe to remote tracks just in case.
         liveKitClient.subscribeToAllRemoteTracks();
       } else {
-        // Still no video, keep warning visible.
         setStatus('Camera still unavailable.', 'error');
       }
     } catch (e) {
@@ -246,10 +190,8 @@
       setStatus('Call preview closed.', 'info');
       return;
     }
-
     isEndingCall = true;
     statusMessage = '';
-
     try {
       const response = await endCall(activeSession.callId);
       setStatus(response.message ?? 'Call ended successfully.', 'success');
@@ -262,455 +204,430 @@
   }
 </script>
 
-<section class="workspace" aria-labelledby="call-workspace-title">
-  <div class="hero">
-    <div class="hero-copy">
-      <p class="eyebrow">Call setup</p>
-      <h2 id="call-workspace-title">One-to-One Call</h2>
-      <p>Start, monitor, and manage a direct call with a single recipient.</p>
-    </div>
-
-    <div class="hero-metrics" aria-label="Call readiness">
-      <div class="metric">
-        <span class="metric-icon" aria-hidden="true"></span>
-        <strong>{callType}</strong>
-        <small>Selected mode</small>
+<div class="workspace" aria-labelledby="workspace-title">
+  <!-- Workspace header -->
+  <header class="workspace-header">
+    <div class="workspace-title-group">
+      <div class="workspace-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1A19.4 19.4 0 013.1 10.8 19.8 19.8 0 012.1 2.2 2 2 0 014.1 0h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8.1 7.9a16 16 0 006 6l1.2-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0122 14.9z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
-      <div class="metric">
-        <span class="metric-icon is-ready" aria-hidden="true"></span>
-        <strong>Ready</strong>
-        <small>Workspace online</small>
+      <div>
+        <p class="workspace-eyebrow">Call workspace</p>
+        <h2 id="workspace-title">One-to-One Call</h2>
       </div>
     </div>
-  </div>
 
+    <div class="workspace-badges">
+      <span class="badge badge-type">
+        <span class="badge-dot" aria-hidden="true"></span>
+        {callType}
+      </span>
+      <span class="badge badge-ready">
+        <span class="badge-dot badge-dot--green" aria-hidden="true"></span>
+        Ready
+      </span>
+    </div>
+  </header>
+
+  <!-- Active call session -->
   {#if activeSession}
     <CallSession session={activeSession} {isEndingCall} on:endCall={handleEndActiveCall} />
   {/if}
 
-  <div class="content-grid">
-    <article class="panel primary-panel" aria-labelledby="initiate-title">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon" aria-hidden="true">
-            <span></span>
-          </span>
-          <div>
-            <p class="panel-kicker">Outbound</p>
-            <h3 id="initiate-title">Initiate call</h3>
+  <!-- Setup panels -->
+  <div class="panels">
+    <!-- Outbound panel -->
+    <article class="panel" aria-labelledby="initiate-title">
+      <header class="panel-head">
+        <div class="panel-head-icon outbound" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <p class="panel-eyebrow">Outbound</p>
+          <h3 id="initiate-title">Initiate call</h3>
+        </div>
+      </header>
+
+      <form class="panel-form" on:submit|preventDefault={handleInitiateCall} novalidate>
+        <!-- Call mode -->
+        <div class="form-field">
+          <label class="field-label" for="call-mode">Call mode</label>
+          <div class="select-wrap">
+            <select id="call-mode" class="styled-select" bind:value={callMode} disabled={isSubmitting}>
+              <option value="one-to-one">One-to-One</option>
+              <option value="conference">Conference</option>
+            </select>
+            <span class="select-caret" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M3.5 5.5L7 9l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
           </div>
         </div>
-        <span class="pill">{callType}</span>
-      </div>
 
-      <form class="form" on:submit|preventDefault={handleInitiateCall} novalidate>
-        <label class="field" for="call-mode">
-          <span>Call mode</span>
-          <select id="call-mode" bind:value={callMode} disabled={isSubmitting}>
-            <option value="one-to-one">One-to-One Call</option>
-            <option value="conference">Conference Call</option>
-          </select>
-        </label>
-
+        <!-- Recipient ID -->
         <Input
           id="callee-id"
           name="calleeId"
-          label={callMode === 'one-to-one' ? 'Callee User ID' : 'Callee User IDs (comma-separated)'}
+          label={callMode === 'one-to-one' ? 'Recipient user ID' : 'Recipient user IDs (comma-separated)'}
           bind:value={calleeId}
           error={fieldError}
           placeholder={callMode === 'one-to-one' ? 'e.g. 1001' : 'e.g. 1001, 1002, 1003'}
           disabled={isSubmitting}
           required
-          on:input={() => {
-            fieldError = '';
-            statusMessage = '';
-          }}
+          on:input={() => { fieldError = ''; statusMessage = ''; }}
         />
 
-        <label class="field" for="call-type">
-          <span>Call type</span>
-          <select id="call-type" bind:value={callType} disabled={isSubmitting}>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-          </select>
-        </label>
-
-        <div class="recording-row">
-          <label class="recording-label">
-            <input type="checkbox" bind:checked={isRecording} disabled={isSubmitting} />
-            <span>Enable Call Recording</span>
-          </label>
+        <!-- Call type toggle -->
+        <div class="form-field">
+          <span class="field-label">Call type</span>
+          <CallTypeToggle bind:value={callType} disabled={isSubmitting} />
         </div>
 
-        <Button type="submit" size="lg" loading={isSubmitting}>Initiate call</Button>
+        <!-- Recording -->
+        <label class="checkbox-row">
+          <input
+            type="checkbox"
+            class="checkbox"
+            bind:checked={isRecording}
+            disabled={isSubmitting}
+          />
+          <span>Enable call recording</span>
+        </label>
+
+        <Button type="submit" size="lg" loading={isSubmitting}>
+          Start call
+        </Button>
       </form>
 
       <CallStatus message={statusMessage} variant={statusVariant} />
+
       {#if !videoAvailable}
         <div class="video-warning">
-          <p>Camera is currently in use by another application. Video is disabled.</p>
-          <Button type="button" on:click={retryVideo}>Retry video</Button>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2L14.5 13H1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M8 6v3M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <div>
+            <strong>Camera unavailable</strong>
+            <p>Camera is in use by another application. Video is disabled.</p>
+          </div>
+          <Button type="button" size="sm" variant="ghost" on:click={retryVideo}>Retry</Button>
         </div>
       {/if}
-
     </article>
 
-    <article class="panel secondary-panel" aria-labelledby="accept-title">
-      <div class="panel-header">
-        <div class="panel-title">
-          <span class="panel-icon inbound" aria-hidden="true">
-            <span></span>
-          </span>
-          <div>
-            <p class="panel-kicker">Inbound</p>
-            <h3 id="accept-title">Accept call</h3>
-          </div>
+    <!-- Inbound panel -->
+    <article class="panel" aria-labelledby="accept-title">
+      <header class="panel-head">
+        <div class="panel-head-icon inbound" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
-      </div>
+        <div>
+          <p class="panel-eyebrow">Inbound</p>
+          <h3 id="accept-title">Answer call</h3>
+        </div>
+      </header>
+
       <AcceptCallForm on:accepted={handleAcceptedCall} />
     </article>
   </div>
-</section>
+</div>
 
 <style lang="postcss">
+  /* ── Workspace shell ─────────────────────────────── */
   .workspace {
     display: grid;
-    gap: var(--space-lg);
+    gap: var(--space-xl);
   }
 
-  .hero {
-    position: relative;
+  /* ── Header ──────────────────────────────────────── */
+  .workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    padding-block-end: var(--space-lg);
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .workspace-title-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .workspace-icon {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-lg);
-    align-items: end;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+    place-items: center;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+    flex-shrink: 0;
     border-radius: var(--radius-md);
-    background:
-      radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--color-secondary) 22%, transparent), transparent 18rem),
-      linear-gradient(135deg, var(--color-surface) 0%, #eef7f5 100%);
-    padding: clamp(1.25rem, 3vw, 2rem);
-    box-shadow: 0 1.25rem 3rem rgb(23 32 38 / 10%);
+    background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-secondary) 18%, var(--color-border));
+    color: var(--color-secondary);
   }
 
-  .hero::before,
-  .hero::after {
-    content: '';
-    position: absolute;
-    border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, transparent);
-    border-radius: 999px;
-    pointer-events: none;
-  }
-
-  .hero::before {
-    inline-size: 16rem;
-    block-size: 16rem;
-    inset-block-start: -9rem;
-    inset-inline-end: -4rem;
-  }
-
-  .hero::after {
-    inline-size: 9rem;
-    block-size: 9rem;
-    inset-block-end: -5rem;
-    inset-inline-end: 9rem;
-    border-color: color-mix(in srgb, var(--color-tertiary) 24%, transparent);
-  }
-
-  .hero-copy,
-  .hero-metrics {
-    position: relative;
-    z-index: 1;
-  }
-
-  .hero-copy {
-    display: grid;
-    gap: var(--space-xs);
-    max-inline-size: 42rem;
-  }
-
-  .hero-metrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(7rem, 1fr));
-    gap: var(--space-sm);
-  }
-
-  .eyebrow,
-  h2,
-  h3,
-  p,
-  .metric strong,
-  .metric small,
-  .panel-kicker {
+  .workspace-eyebrow {
     margin: 0;
-  }
-
-  .eyebrow {
-    color: var(--color-tertiary);
-    font-size: 0.78rem;
-    font-weight: 800;
+    color: var(--color-subtle);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
   h2 {
-    margin-block-start: var(--space-xs);
+    margin: 0;
     color: var(--color-text);
-    font-size: clamp(2rem, 4vw, 3.25rem);
-    line-height: 1.1;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
 
-  h3 {
-    color: var(--color-text);
-    font-size: 1.05rem;
-    line-height: 1.3;
+  .workspace-badges {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
   }
 
-  p {
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
     color: var(--color-muted);
-    line-height: 1.5;
-  }
-
-  .metric {
-    display: grid;
-    gap: 0.22rem;
-    min-inline-size: 8rem;
-    border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-    border-radius: var(--radius-md);
-    background: rgb(255 255 255 / 72%);
-    padding: var(--space-md);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 72%);
-  }
-
-  .metric-icon {
-    inline-size: 0.75rem;
-    block-size: 0.75rem;
-    border-radius: 999px;
-    background: var(--color-secondary);
-    box-shadow: 0 0 0 0.38rem color-mix(in srgb, var(--color-secondary) 16%, transparent);
-  }
-
-  .metric-icon.is-ready {
-    background: var(--color-tertiary);
-    box-shadow: 0 0 0 0.38rem color-mix(in srgb, var(--color-tertiary) 16%, transparent);
-  }
-
-  .metric strong {
-    color: var(--color-text);
-    font-size: 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.25rem 0.625rem;
     text-transform: capitalize;
   }
 
-  .metric small {
-    color: var(--color-muted);
-    font-size: 0.78rem;
-    font-weight: 700;
+  .badge-dot {
+    inline-size: 0.4375rem;
+    block-size: 0.4375rem;
+    border-radius: 999px;
+    background: var(--color-secondary);
   }
 
-  .content-grid {
+  .badge-dot--green {
+    background: var(--color-success);
+  }
+
+  /* ── Panels layout ────────────────────────────────── */
+  .panels {
     display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.85fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.8fr);
     gap: var(--space-lg);
     align-items: start;
   }
 
+  /* ── Panel card ──────────────────────────────────── */
   .panel {
-    position: relative;
     display: grid;
     gap: var(--space-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    padding: var(--space-xl);
+    box-shadow: var(--shadow-sm);
     margin: 0;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-    border-radius: var(--radius-md);
-    background: rgb(255 255 255 / 82%);
-    padding: var(--space-lg);
-    box-shadow: 0 1rem 2.5rem rgb(23 32 38 / 8%);
   }
 
-  .panel::before {
-    content: '';
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline: 0;
-    block-size: 0.25rem;
-    background: linear-gradient(90deg, var(--color-secondary), var(--color-tertiary));
-  }
-
-  .secondary-panel::before {
-    background: linear-gradient(90deg, var(--color-tertiary), var(--color-primary));
-  }
-
-  .panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-md);
-  }
-
-  .panel-title {
+  .panel-head {
     display: flex;
     align-items: center;
     gap: var(--space-md);
   }
 
-  .panel-icon {
-    position: relative;
-    display: inline-grid;
-    flex: 0 0 auto;
+  .panel-head-icon {
+    display: grid;
     place-items: center;
-    inline-size: 2.75rem;
-    block-size: 2.75rem;
+    flex-shrink: 0;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
     border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-secondary) 12%, var(--color-surface));
   }
 
-  .panel-icon::before,
-  .panel-icon::after,
-  .panel-icon span {
-    content: '';
-    position: absolute;
-    background: var(--color-secondary);
+  .panel-head-icon.outbound {
+    background: color-mix(in srgb, var(--color-secondary) 10%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-secondary) 18%, var(--color-border));
+    color: var(--color-secondary);
   }
 
-  .panel-icon::before {
-    inline-size: 1.05rem;
-    block-size: 1.05rem;
-    border-radius: 999px;
-    inset-inline-start: 0.55rem;
-  }
-
-  .panel-icon::after {
-    inline-size: 1.05rem;
-    block-size: 1.05rem;
-    border-radius: 999px;
-    inset-inline-end: 0.55rem;
-  }
-
-  .panel-icon span {
-    inline-size: 1.2rem;
-    block-size: 2px;
-    border-radius: 999px;
-  }
-
-  .panel-icon.inbound {
-    background: color-mix(in srgb, var(--color-tertiary) 12%, var(--color-surface));
-  }
-
-  .panel-icon.inbound::before,
-  .panel-icon.inbound::after,
-  .panel-icon.inbound span {
-    background: var(--color-tertiary);
-  }
-
-  .panel-kicker {
-    color: var(--color-muted);
-    font-size: 0.72rem;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-
-  .pill {
-    border-radius: 999px;
+  .panel-head-icon.inbound {
     background: color-mix(in srgb, var(--color-tertiary) 10%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-tertiary) 18%, var(--color-border));
     color: var(--color-tertiary);
-    font-size: 0.78rem;
-    font-weight: 800;
-    padding: 0.3rem 0.65rem;
+  }
+
+  .panel-eyebrow {
+    margin: 0;
+    color: var(--color-subtle);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
-  .form {
+  h3 {
+    margin: 0;
+    color: var(--color-text);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+
+  /* ── Form ────────────────────────────────────────── */
+  .panel-form {
     display: grid;
     gap: var(--space-md);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-background) 55%, var(--color-surface));
-    padding: var(--space-md);
   }
 
-  .field {
+  .form-field {
     display: grid;
-    gap: var(--space-xs);
-    color: var(--color-text);
-    font-size: 0.925rem;
-    font-weight: 700;
+    gap: 0.35rem;
   }
 
-  .recording-row {
-    display: flex;
-    align-items: center;
-    padding: var(--space-xs) 0;
-  }
-
-  .recording-label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    font-size: 0.9rem;
+  .field-label {
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-text);
-    cursor: pointer;
+    line-height: 1.3;
   }
 
-  .recording-label input {
-    inline-size: 1.15rem;
-    block-size: 1.15rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    cursor: pointer;
+  /* Styled select */
+  .select-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
   }
 
-  select {
+  .styled-select {
     inline-size: 100%;
-    border: 1px solid var(--color-border);
+    min-block-size: 2.875rem;
+    border: 1.5px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-size: 1rem;
+    font-size: 0.9375rem;
     line-height: 1.4;
-    padding: 0.75rem var(--space-md);
+    padding: 0 2.25rem 0 var(--space-md);
+    cursor: pointer;
+    appearance: none;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease;
   }
 
-  select {
-    min-block-size: 2.75rem;
+  .styled-select:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
   }
 
-  select:focus {
+  .styled-select:focus {
     border-color: var(--color-secondary);
     outline: none;
-    box-shadow:
-      0 0 0 2px var(--color-background),
-      0 0 0 5px color-mix(in srgb, var(--color-secondary) 24%, transparent);
+    box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.15);
   }
 
-  select:disabled {
+  .styled-select:disabled {
     cursor: not-allowed;
-    opacity: 0.62;
+    opacity: 0.55;
+    background: var(--color-surface-raised);
   }
 
-  @media (max-width: 980px) {
-    .hero {
-      grid-template-columns: 1fr;
-      align-items: start;
-    }
+  .select-caret {
+    position: absolute;
+    inset-inline-end: 0.75rem;
+    display: grid;
+    place-items: center;
+    color: var(--color-subtle);
+    pointer-events: none;
+  }
 
-    .hero-metrics {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  /* Checkbox */
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+  }
 
-    .content-grid {
+  .checkbox {
+    inline-size: 1rem;
+    block-size: 1rem;
+    flex-shrink: 0;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    accent-color: var(--color-secondary);
+  }
+
+  /* Video warning */
+  .video-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border: 1px solid var(--color-error-border);
+    border-radius: var(--radius-md);
+    background: var(--color-error-bg);
+    padding: 0.875rem 1rem;
+    color: var(--color-error);
+    font-size: 0.875rem;
+  }
+
+  .video-warning svg {
+    flex-shrink: 0;
+    margin-block-start: 0.15rem;
+  }
+
+  .video-warning div {
+    flex: 1;
+    display: grid;
+    gap: 0.2rem;
+  }
+
+  .video-warning strong {
+    font-weight: 700;
+  }
+
+  .video-warning p {
+    margin: 0;
+    color: var(--color-error);
+    opacity: 0.8;
+  }
+
+  @media (max-width: 900px) {
+    .panels {
       grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 560px) {
-    .hero-metrics {
-      grid-template-columns: 1fr;
+    .workspace-header {
+      flex-direction: column;
+      align-items: flex-start;
     }
 
-    .panel-header {
-      align-items: flex-start;
-      flex-direction: column;
+    .panel {
+      padding: var(--space-lg);
     }
   }
 </style>

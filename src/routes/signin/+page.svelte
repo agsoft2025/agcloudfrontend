@@ -4,7 +4,7 @@
   import AuthShell from '$lib/components/auth/AuthShell.svelte';
   import Button from '$lib/components/atoms/Button.svelte';
   import Input from '$lib/components/atoms/Input.svelte';
-  import { getAuthErrorMessage, signIn, storeAuthTokens } from '$lib/api/auth.api';
+  import { getAuthErrorMessage, hasAuthToken, signIn, storeAuthTokens } from '$lib/api/auth.api';
 
   const signinSchema = z.object({
     email: z.string().trim().min(1, 'Email is required.').email('Enter a valid email address.'),
@@ -56,6 +56,10 @@
 
     try {
       const data = await signIn(payload);
+      if (!hasAuthToken(data)) {
+        serverError = 'Sign-in succeeded, but the API did not return a session token. Calls cannot be started until the backend returns token or accessToken from /auth/signin.';
+        return;
+      }
       storeAuthTokens(data);
       await goto('/home');
     } catch (error) {

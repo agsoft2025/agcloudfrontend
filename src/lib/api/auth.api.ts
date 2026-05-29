@@ -70,7 +70,7 @@ export async function resetPassword(payload: ResetPasswordPayload) {
 
 export function storeAuthTokens(data: unknown) {
   if (!data || typeof data !== 'object') {
-    return;
+    return false;
   }
 
   const value = data as {
@@ -90,6 +90,19 @@ export function storeAuthTokens(data: unknown) {
   if (isAuthUser(value.user)) {
     userStore.setProfile(value.user);
   }
+
+  return typeof accessToken === 'string' && accessToken.length > 0;
+}
+
+export function hasAuthToken(data: unknown) {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  const value = data as { accessToken?: unknown; token?: unknown };
+  const accessToken = value.accessToken ?? value.token;
+
+  return typeof accessToken === 'string' && accessToken.length > 0;
 }
 
 export function getAuthErrorMessage(error: unknown, fallback = 'Unable to sign in. Please try again.') {

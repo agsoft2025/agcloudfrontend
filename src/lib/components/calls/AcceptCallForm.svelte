@@ -80,37 +80,46 @@
 </script>
 
 <form class="accept-form" on:submit|preventDefault={() => handleCallAction('accept')} novalidate>
-  <Input
-    id="accept-call-id"
-    name="callId"
-    label="Incoming call ID"
-    bind:value={callId}
-    error={error}
-    placeholder="Paste call ID"
-    disabled={isSubmitting}
-    required
-    on:input={() => {
-      error = '';
-      statusMessage = '';
-    }}
-  />
+  <div class="form-body">
+    <Input
+      id="accept-call-id"
+      name="callId"
+      label="Incoming call ID"
+      bind:value={callId}
+      {error}
+      placeholder="Paste call ID here"
+      disabled={isSubmitting}
+      required
+      on:input={() => {
+        error = '';
+        statusMessage = '';
+      }}
+    />
+  </div>
 
   <div class="actions">
-    <Button type="submit" variant="secondary" loading={isSubmitting && action === 'accept'} disabled={isSubmitting}>
-      Accept call
+    <Button
+      type="submit"
+      variant="secondary"
+      loading={isSubmitting && action === 'accept'}
+      disabled={isSubmitting}
+    >
+      Accept
     </Button>
+
     <Button
       type="button"
-      variant="danger"
+      variant="ghost"
       loading={isSubmitting && action === 'reject'}
       disabled={isSubmitting}
       on:click={() => handleCallAction('reject')}
     >
-      Reject call
+      Decline
     </Button>
+
     <Button
       type="button"
-      variant="ghost"
+      variant="danger"
       loading={isSubmitting && action === 'end'}
       disabled={isSubmitting}
       on:click={() => handleCallAction('end')}
@@ -128,13 +137,20 @@
     gap: var(--space-md);
   }
 
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
+  .form-body {
+    display: grid;
     gap: var(--space-sm);
   }
 
-  .actions :global(.button) {
-    flex: 1 1 120px;
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--space-sm);
+  }
+
+  @media (max-width: 560px) {
+    .actions {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

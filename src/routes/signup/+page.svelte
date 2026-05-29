@@ -4,7 +4,8 @@
   import AuthShell from '$lib/components/auth/AuthShell.svelte';
   import Button from '$lib/components/atoms/Button.svelte';
   import Input from '$lib/components/atoms/Input.svelte';
-  import { getAuthErrorMessage, signIn, signUp, storeAuthTokens } from '$lib/api/auth.api';
+  import PasswordStrength from '$lib/components/atoms/PasswordStrength.svelte';
+  import { getAuthErrorMessage, hasAuthToken, signIn, signUp, storeAuthTokens } from '$lib/api/auth.api';
 
   const signupSchema = z.object({
     displayName: z.string().trim().min(1, 'Display name is required.'),
@@ -15,11 +16,7 @@
   type SignupForm = z.infer<typeof signupSchema>;
   type FieldErrors = Partial<Record<keyof SignupForm, string>>;
 
-  let form: SignupForm = {
-    displayName: '',
-    email: '',
-    password: ''
-  };
+  let form: SignupForm = { displayName: '', email: '', password: '' };
   let errors: FieldErrors = {};
   let serverError = '';
   let isSubmitting = false;
@@ -27,45 +24,29 @@
   function validateForm() {
     const result = signupSchema.safeParse(form);
     errors = {};
-
-    if (result.success) {
-      form = result.data;
-      return result.data;
-    }
-
-    errors = result.error.issues.reduce<FieldErrors>((nextErrors, issue) => {
+    if (result.success) { form = result.data; return result.data; }
+    errors = result.error.issues.reduce<FieldErrors>((acc, issue) => {
       const field = issue.path[0];
-
-      if (
-        (field === 'displayName' || field === 'email' || field === 'password') &&
-        !nextErrors[field]
-      ) {
-        nextErrors[field] = issue.message;
+      if ((field === 'displayName' || field === 'email' || field === 'password') && !acc[field]) {
+        acc[field] = issue.message;
       }
-
-      return nextErrors;
+      return acc;
     }, {});
-
     return null;
   }
 
   async function handleSubmit() {
     serverError = '';
     const payload = validateForm();
-
-    if (!payload) {
-      return;
-    }
-
+    if (!payload) return;
     isSubmitting = true;
-
     try {
       await signUp(payload);
-      const data = await signIn({
-        email: payload.email,
-        password: payload.password
-      });
-
+      const data = await signIn({ email: payload.email, password: payload.password });
+      if (!hasAuthToken(data)) {
+        serverError = 'Account created, but the API did not return a session token. Calls cannot be started until the backend returns token or accessToken from /auth/signin.';
+        return;
+      }
       storeAuthTokens(data);
       await goto('/home');
     } catch (error) {
@@ -95,13 +76,10 @@
       bind:value={form.displayName}
       error={errors.displayName}
       autocomplete="name"
-      placeholder="Test User"
+      placeholder="Your name"
       required
       disabled={isSubmitting}
-      on:input={() => {
-        errors.displayName = undefined;
-        serverError = '';
-      }}
+      on:input={() => { errors.displayName = undefined; serverError = ''; }}
     />
 
     <Input
@@ -115,28 +93,25 @@
       placeholder="you@example.com"
       required
       disabled={isSubmitting}
-      on:input={() => {
-        errors.email = undefined;
-        serverError = '';
-      }}
+      on:input={() => { errors.email = undefined; serverError = ''; }}
     />
 
-    <Input
-      id="password"
-      name="password"
-      label="Password"
-      type="password"
-      bind:value={form.password}
-      error={errors.password}
-      autocomplete="new-password"
-      placeholder="Create a password"
-      required
-      disabled={isSubmitting}
-      on:input={() => {
-        errors.password = undefined;
-        serverError = '';
-      }}
-    />
+    <div class="password-field">
+      <Input
+        id="password"
+        name="password"
+        label="Password"
+        type="password"
+        bind:value={form.password}
+        error={errors.password}
+        autocomplete="new-password"
+        placeholder="Create a password (min. 8 characters)"
+        required
+        disabled={isSubmitting}
+        on:input={() => { errors.password = undefined; serverError = ''; }}
+      />
+      <PasswordStrength password={form.password} />
+    </div>
 
     <Button type="submit" size="lg" loading={isSubmitting}>
       Create account
@@ -148,3 +123,10 @@
     <a href="/signin">Sign in</a>
   </p>
 </AuthShell>
+
+<style>
+  .password-field {
+    display: grid;
+    gap: 0.5rem;
+  }
+</style>
