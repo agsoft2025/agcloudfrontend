@@ -11,7 +11,7 @@ const ASSETS = new Set([
   ...files,
   ...prerendered,
   '/manifest.webmanifest',
-  '/favicon.svg'
+  '/favicon.png'
 ]);
 
 worker.addEventListener('install', (event) => {

@@ -29,6 +29,8 @@
 
 <style lang="postcss">
   .nav-item {
+    isolation: isolate;
+    overflow: hidden;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -45,12 +47,41 @@
     position: relative;
     transition:
       background-color 140ms ease,
-      color 140ms ease;
+      color 140ms ease,
+      transform 140ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .nav-item::before,
+  .nav-item::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+
+  .nav-item::before {
+    inset-block: 0.55rem;
+    inset-inline-start: 0;
+    inline-size: 3px;
+    border-radius: 0 999px 999px 0;
+    background: linear-gradient(180deg, #7ecfff 0%, var(--color-secondary) 100%);
+    box-shadow: 0 0 14px rgba(126, 207, 255, 0.75);
+  }
+
+  .nav-item::after {
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(circle at 16% 18%, rgba(126, 207, 255, 0.22), transparent 34%),
+      linear-gradient(135deg, rgba(78, 135, 255, 0.24), rgba(255, 255, 255, 0.08));
   }
 
   .nav-item:hover {
     background: rgba(255, 255, 255, 0.05);
     color: rgba(255, 255, 255, 0.92);
+    transform: translateX(2px);
   }
 
   .nav-item:focus-visible {
@@ -59,8 +90,16 @@
   }
 
   .nav-item.active {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 10px 24px rgba(0, 0, 0, 0.16);
+  }
+
+  .nav-item.active::before,
+  .nav-item.active::after {
+    opacity: 1;
   }
 
   .nav-icon {
@@ -70,11 +109,21 @@
     inline-size: 1.25rem;
     block-size: 1.25rem;
     color: rgba(255, 255, 255, 0.55);
-    transition: color 140ms ease;
+    border-radius: 8px;
+    transition:
+      background-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
   }
 
   .nav-item.active .nav-icon {
-    color: var(--color-secondary);
+    /* background: rgba(255, 255, 255, 0.14); */
+    color: #7ecfff;
+    transform: scale(1.04);
+  }
+
+  .nav-item.active .nav-desc {
+    color: rgba(255, 255, 255, 0.68);
   }
 
   .nav-copy {
@@ -104,7 +153,9 @@
     inline-size: 0.5rem;
     block-size: 0.5rem;
     border-radius: 999px;
-    background: var(--color-secondary);
-    box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.22);
+    background: #7ecfff;
+    box-shadow:
+      0 0 0 3px rgba(126, 207, 255, 0.16),
+      0 0 16px rgba(126, 207, 255, 0.72);
   }
 </style>

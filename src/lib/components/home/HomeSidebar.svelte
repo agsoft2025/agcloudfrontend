@@ -85,7 +85,8 @@
       userStore.clear();
       mobileOpen = false;
       isLoggingOut = false;
-      await goto('/signin');
+      // replaceState removes /home from history so Back cannot return to it
+      await goto('/signin', { replaceState: true });
     }
   }
 </script>
@@ -107,18 +108,7 @@
 >
   <header class="sidebar-header">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg class="brand-icon" width="20" height="20" viewBox="0 0 22 22" fill="none">
-          <path
-            d="M4.5 6.5C4.5 5.12 5.62 4 7 4H15C16.38 4 17.5 5.12 17.5 6.5C17.5 7.88 16.38 9 15 9H13L9.5 12.5V9H7C5.62 9 4.5 7.88 4.5 6.5Z"
-            fill="currentColor"
-            opacity="0.95"
-          />
-          <circle cx="16" cy="16" r="4.5" fill="currentColor" opacity="0.35" />
-          <circle cx="16" cy="16" r="2.5" fill="currentColor" />
-        </svg>
-      </span>
-      <span class="brand-name">AG Cloud</span>
+      <img class="brand-logo" src="/logo.png" alt="AG Cloud" />
     </div>
 
     <button
@@ -135,7 +125,6 @@
 
   <div class="sidebar-main">
     <nav class="nav-section" aria-label="Main menu">
-      <p class="section-label">Main Menu</p>
 
       {#each items as item (item.id)}
         <NavItem
@@ -224,42 +213,25 @@
   .sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    justify-content: center;
+    gap: 0  .75rem;
     flex-shrink: 0;
-    padding: 1.25rem 1.25rem 1rem;
+    background-color: #F2F2F2;
+    opacity: 0.6;
   }
 
   .brand {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
     min-inline-size: 0;
   }
 
-  .brand-mark {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    inline-size: 2.25rem;
-    block-size: 2.25rem;
-    border-radius: 10px;
-    background: linear-gradient(145deg, rgba(78, 135, 255, 0.28) 0%, rgba(78, 135, 255, 0.12) 100%);
-    border: 1px solid rgba(78, 135, 255, 0.35);
-    color: #ffffff;
-    box-shadow: 0 0 20px rgba(78, 135, 255, 0.22);
-  }
-
-  .brand-icon {
+  .brand-logo {
     display: block;
-  }
-
-  .brand-name {
-    color: #ffffff;
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
+    block-size: 4.75rem;
+    inline-size: auto;
+    max-inline-size: 12rem;
+    object-fit: contain;
   }
 
   .icon-btn {
@@ -292,7 +264,7 @@
   .sidebar-main {
     flex: 1;
     min-block-size: 0;
-    padding: 0 0.75rem;
+    padding: 0.5rem 0.75rem;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;

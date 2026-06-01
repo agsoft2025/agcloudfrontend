@@ -226,16 +226,14 @@
   <!-- ── Top header bar ──────────────────────────── -->
   <header class="meeting-header">
     <div class="header-left">
-      <!-- Brand mark -->
-      <div class="brand-mark" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
-          <path d="M4.5 6.5C4.5 5.12 5.62 4 7 4H15C16.38 4 17.5 5.12 17.5 6.5C17.5 7.88 16.38 9 15 9H13L9.5 12.5V9H7C5.62 9 4.5 7.88 4.5 6.5Z" fill="#7ecfff" opacity="0.9"/>
-          <circle cx="16" cy="16" r="4.5" fill="#7ecfff" opacity="0.35"/>
-          <circle cx="16" cy="16" r="2.5" fill="#7ecfff"/>
-        </svg>
-      </div>
+      <img class="meeting-logo" src="/logo.png" alt="AG Cloud" />
       <div class="header-title">
-        <span class="meeting-title">One-to-One Call</span>
+        <span class="call-type-icon" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M15 10l5-3v10l-5-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="2" y="6" width="11" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </span>
         <span class="connection-badge" class:connected={isConnected}>
           {isConnected ? 'Connected' : $callStore.connectionState}
         </span>
@@ -405,7 +403,6 @@
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1A19.4 19.4 0 013.1 10.8 19.8 19.8 0 012.1 2.2 2 2 0 014.1 0h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8.1 7.9a16 16 0 006 6l1.2-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0122 14.9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>End call</span>
     </button>
 
     <!-- Right group -->
@@ -490,20 +487,18 @@
   .header-left {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 0.75rem;
     min-inline-size: 0;
     flex: 1;
   }
 
-  .brand-mark {
-    display: grid;
-    place-items: center;
+  .meeting-logo {
+    display: block;
     flex-shrink: 0;
-    inline-size: 2rem;
-    block-size: 2rem;
-    border-radius: 8px;
-    background: rgba(126, 207, 255, 0.1);
-    border: 1px solid rgba(126, 207, 255, 0.18);
+    inline-size: auto;
+    block-size: 2.15rem;
+    max-inline-size: 9.5rem;
+    object-fit: contain;
   }
 
   .header-title {
@@ -514,14 +509,17 @@
     overflow: hidden;
   }
 
-  .meeting-title {
-    font-size: 0.9375rem;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.92);
-    letter-spacing: -0.015em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .call-type-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    inline-size: 2rem;
+    block-size: 2rem;
+    border-radius: 10px;
+    color: #7ecfff;
+    background:
+      linear-gradient(135deg, rgba(126, 207, 255, 0.18), rgba(78, 135, 255, 0.08));
+    border: 1px solid rgba(126, 207, 255, 0.24);
   }
 
   .connection-badge {

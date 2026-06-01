@@ -51,33 +51,17 @@
       <span class="leading-icon" aria-hidden="true">
         {#if leadingIcon === 'email'}
           <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M4 6h16v12H4V6zm0 0l8 6 8-6"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
+            <path d="M4 6h16v12H4V6zm0 0l8 6 8-6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         {:else if leadingIcon === 'password'}
           <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.75" />
-            <path
-              d="M8 11V8a4 4 0 118 0v3"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-            />
+            <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M8 11V8a4 4 0 118 0v3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
           </svg>
         {:else if leadingIcon === 'user'}
           <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.75" />
-            <path
-              d="M5 20c0-3.866 3.134-7 7-7s7 3.134 7 7"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-            />
+            <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M5 20c0-3.866 3.134-7 7-7s7 3.134 7 7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
           </svg>
         {/if}
       </span>
@@ -112,25 +96,13 @@
       >
         {#if showPassword}
           <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         {:else}
           <svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
           </svg>
         {/if}
       </button>
@@ -143,9 +115,9 @@
     {:else if error}
       <p class="error-msg" id={errorId} role="alert">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5" />
-          <path d="M7 4v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          <circle cx="7" cy="10" r="0.75" fill="currentColor" />
+          <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7 4v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="7" cy="10" r="0.75" fill="currentColor"/>
         </svg>
         <span>{error}</span>
       </p>
@@ -160,7 +132,6 @@
     --icon-color: #9ca3af;
     --field-label-gap: 0.375rem;
     --field-message-gap: 0.375rem;
-
     display: grid;
     grid-template-rows: auto auto auto;
     row-gap: var(--field-label-gap);
@@ -195,10 +166,7 @@
     font-weight: 700;
   }
 
-  .required {
-    color: var(--color-error);
-    font-size: 0.9em;
-  }
+  .required { color: var(--color-error); font-size: 0.9em; }
 
   .input-wrap {
     position: relative;
@@ -227,10 +195,7 @@
     z-index: 1;
   }
 
-  .icon-svg {
-    display: block;
-    flex-shrink: 0;
-  }
+  .icon-svg { display: block; flex-shrink: 0; }
 
   .input {
     box-sizing: border-box;
@@ -248,25 +213,14 @@
     line-height: 1.25;
     padding-block: 0;
     padding-inline: 0.875rem;
-    transition:
-      border-color 180ms ease,
-      box-shadow 180ms ease,
-      background-color 180ms ease;
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   }
 
-  .has-leading-icon .input {
-    padding-inline-start: var(--icon-gutter) !important;
-  }
+  .has-leading-icon .input { padding-inline-start: var(--icon-gutter) !important; }
+  .has-toggle .input { padding-inline-end: var(--icon-gutter) !important; }
+  .has-leading-icon:not(.has-toggle) .input { padding-inline-end: 0.875rem !important; }
 
-  .has-toggle .input {
-    padding-inline-end: var(--icon-gutter) !important;
-  }
-
-  .has-leading-icon:not(.has-toggle) .input {
-    padding-inline-end: 0.875rem !important;
-  }
-
-  /* Pico applies padding + invalid icon when aria-invalid is set; keep our layout */
+  /* Pico applies padding + invalid icon; keep our layout */
   .input[aria-invalid] {
     background-image: none !important;
     background-position: unset !important;
@@ -274,17 +228,9 @@
     background-repeat: unset !important;
   }
 
-  .has-leading-icon .input[aria-invalid] {
-    padding-inline-start: var(--icon-gutter) !important;
-  }
-
-  .has-toggle .input[aria-invalid] {
-    padding-inline-end: var(--icon-gutter) !important;
-  }
-
-  .has-leading-icon:not(.has-toggle) .input[aria-invalid] {
-    padding-inline-end: 0.875rem !important;
-  }
+  .has-leading-icon .input[aria-invalid] { padding-inline-start: var(--icon-gutter) !important; }
+  .has-toggle .input[aria-invalid] { padding-inline-end: var(--icon-gutter) !important; }
+  .has-leading-icon:not(.has-toggle) .input[aria-invalid] { padding-inline-end: 0.875rem !important; }
 
   .appearance-auth .input {
     border: 1px solid transparent;
@@ -292,9 +238,7 @@
     background: #eef3f9;
   }
 
-  .appearance-auth .input:hover:not(:disabled) {
-    background: #e8eef6;
-  }
+  .appearance-auth .input:hover:not(:disabled) { background: #e8eef6; }
 
   .appearance-auth .input:focus {
     border-color: var(--color-secondary);
@@ -302,14 +246,8 @@
     box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.14);
   }
 
-  .input::placeholder {
-    color: var(--color-subtle);
-    opacity: 1;
-  }
-
-  .input:hover:not(:disabled) {
-    border-color: var(--color-border-strong);
-  }
+  .input::placeholder { color: var(--color-subtle); opacity: 1; }
+  .input:hover:not(:disabled) { border-color: var(--color-border-strong); }
 
   .input:focus {
     border-color: var(--color-secondary);
@@ -317,20 +255,10 @@
     box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
-  .input:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-    background: var(--color-surface-raised);
-  }
+  .input:disabled { cursor: not-allowed; opacity: 0.55; background: var(--color-surface-raised); }
 
-  .has-error .input {
-    border-color: var(--color-error);
-    background: rgba(220, 38, 38, 0.02);
-  }
-
-  .appearance-auth.has-error .input {
-    background: #fef8f8;
-  }
+  .has-error .input { border-color: var(--color-error); background: rgba(220, 38, 38, 0.02); }
+  .appearance-auth.has-error .input { background: #fef8f8; }
 
   .has-error .input:focus {
     border-color: var(--color-error);
@@ -348,21 +276,10 @@
     transition: color 120ms ease;
   }
 
-  .toggle-visibility:hover {
-    color: var(--color-muted);
-  }
+  .toggle-visibility:hover { color: var(--color-muted); }
+  .toggle-visibility:focus-visible { outline: 2px solid var(--color-secondary); outline-offset: 1px; }
 
-  .toggle-visibility:focus-visible {
-    outline: 2px solid var(--color-secondary);
-    outline-offset: 1px;
-  }
-
-  .hint {
-    margin: 0;
-    color: var(--color-subtle);
-    font-size: 0.8125rem;
-    line-height: 1.35;
-  }
+  .hint { margin: 0; color: var(--color-subtle); font-size: 0.8125rem; line-height: 1.35; }
 
   .error-msg {
     display: flex;
@@ -377,19 +294,10 @@
   }
 
   .error-msg .icon-svg,
-  .error-msg > svg {
-    flex-shrink: 0;
-    margin-block-start: 0.1rem;
-  }
+  .error-msg > svg { flex-shrink: 0; margin-block-start: 0.1rem; }
 
   @keyframes err-in {
-    from {
-      opacity: 0;
-      transform: translateY(-3px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 </style>
