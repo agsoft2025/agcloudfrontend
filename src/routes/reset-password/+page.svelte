@@ -107,6 +107,8 @@
       name="password"
       label="New password"
       type="password"
+      leadingIcon="password"
+      appearance="auth"
       bind:value={form.password}
       error={errors.password}
       autocomplete="new-password"
@@ -125,6 +127,8 @@
       name="confirmPassword"
       label="Confirm password"
       type="password"
+      leadingIcon="password"
+      appearance="auth"
       bind:value={form.confirmPassword}
       error={errors.confirmPassword}
       autocomplete="new-password"
@@ -138,7 +142,7 @@
       }}
     />
 
-    <Button type="submit" size="lg" loading={isSubmitting}>
+    <Button type="submit" size="lg" variant="secondary" fullWidth loading={isSubmitting}>
       Reset password
     </Button>
   </form>

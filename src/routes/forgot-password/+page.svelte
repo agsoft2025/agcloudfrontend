@@ -84,6 +84,8 @@
       name="email"
       label="Email"
       type="text"
+      leadingIcon="email"
+      appearance="auth"
       bind:value={form.email}
       error={errors.email}
       autocomplete="email"
@@ -97,7 +99,7 @@
       }}
     />
 
-    <Button type="submit" size="lg" loading={isSubmitting}>
+    <Button type="submit" size="lg" variant="secondary" fullWidth loading={isSubmitting}>
       Send reset link
     </Button>
   </form>

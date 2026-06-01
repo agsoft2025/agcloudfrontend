@@ -5,30 +5,20 @@
 </script>
 
 <div class="auth-page" role="main">
-  <div class="bg-canvas" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-    <div class="orb orb-4"></div>
-  </div>
-
   <div class="auth-shell">
-    <!-- Left: Brand panel -->
     <aside class="brand-panel" aria-label="Product information">
       <header class="brand-header">
         <div class="brand-logo" aria-label="{eyebrow} home">
-          <svg class="logo-icon" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-            <path d="M4.5 6.5C4.5 5.12 5.62 4 7 4H15C16.38 4 17.5 5.12 17.5 6.5C17.5 7.88 16.38 9 15 9H13L9.5 12.5V9H7C5.62 9 4.5 7.88 4.5 6.5Z" fill="currentColor" opacity="0.9"/>
-            <circle cx="16" cy="16" r="4.5" fill="currentColor" opacity="0.4"/>
-            <circle cx="16" cy="16" r="2.5" fill="currentColor"/>
-          </svg>
-          <span class="logo-wordmark">{eyebrow}</span>
+          <img class="brand-logo-image" src="/logo.png" alt={eyebrow} />
         </div>
       </header>
 
       <div class="brand-body">
         <p class="brand-kicker">Private Cloud Calling</p>
-        <h2 class="brand-headline">The secure platform<br />for team voice.</h2>
+        <h2 class="brand-headline">
+          The secure platform<br />
+          <span class="brand-headline-accent">for team voice.</span>
+        </h2>
         <p class="brand-desc">
           Enterprise-grade calling infrastructure with end-to-end session security, so only verified users can initiate and manage calls.
         </p>
@@ -37,7 +27,13 @@
           <li class="feature-item">
             <span class="feature-check" aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path
+                  d="M2.5 7L5.5 10L11.5 4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             </span>
             <span>Token-based session protection</span>
@@ -45,7 +41,13 @@
           <li class="feature-item">
             <span class="feature-check" aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path
+                  d="M2.5 7L5.5 10L11.5 4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             </span>
             <span>Account recovery with verified email</span>
@@ -53,7 +55,13 @@
           <li class="feature-item">
             <span class="feature-check" aria-hidden="true">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path
+                  d="M2.5 7L5.5 10L11.5 4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
             </span>
             <span>Controlled access for every workspace</span>
@@ -61,121 +69,57 @@
         </ul>
       </div>
 
-      <div class="brand-deco" aria-hidden="true">
-        <div class="deco-ring r1"></div>
-        <div class="deco-ring r2"></div>
-        <div class="deco-ring r3"></div>
-        <div class="deco-dots">
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-        </div>
+      <div class="brand-illustration" aria-hidden="true">
+        <img src="/authimg1.png" alt="" loading="eager" />
       </div>
     </aside>
 
-    <!-- Right: Auth card -->
     <div class="auth-card">
-      <div class="mobile-brand" aria-hidden="true">
-        <svg class="logo-icon" width="18" height="18" viewBox="0 0 22 22" fill="none">
-          <path d="M4.5 6.5C4.5 5.12 5.62 4 7 4H15C16.38 4 17.5 5.12 17.5 6.5C17.5 7.88 16.38 9 15 9H13L9.5 12.5V9H7C5.62 9 4.5 7.88 4.5 6.5Z" fill="currentColor" opacity="0.9"/>
-          <circle cx="16" cy="16" r="4.5" fill="currentColor" opacity="0.4"/>
-          <circle cx="16" cy="16" r="2.5" fill="currentColor"/>
-        </svg>
-        <span>{eyebrow}</span>
+      <div class="auth-card-inner">
+        <div class="mobile-brand" aria-hidden="true">
+          <img class="brand-logo-image brand-logo-image--mobile" src="/logo.png" alt="" />
+        </div>
+
+        <header class="form-header">
+          <h1 id="auth-title">{title}</h1>
+          <p class="form-subtitle">{subtitle}</p>
+        </header>
+
+        <slot />
+        <slot name="footer" />
       </div>
-
-      <header class="form-header">
-        <h1 id="auth-title">{title}</h1>
-        <p class="form-subtitle">{subtitle}</p>
-      </header>
-
-      <slot />
-      <slot name="footer" />
     </div>
   </div>
 </div>
 
 <style lang="postcss">
   .auth-page {
-    position: relative;
-    min-block-size: 100dvh;
     display: grid;
     place-items: center;
-    padding: clamp(1rem, 3vw, 2rem);
-    overflow: hidden;
-    background: #0d1117;
+    min-block-size: 100dvh;
+    background:
+      radial-gradient(circle at 12% 14%, rgba(78, 135, 255, 0.12) 0, transparent 24rem),
+      radial-gradient(circle at 88% 86%, rgba(44, 110, 99, 0.1) 0, transparent 24rem),
+      linear-gradient(135deg, #f8fafc 0%, #eef5f4 100%);
+    overflow: auto;
   }
 
-  /* Background orbs */
-  .bg-canvas {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 0;
+  :global(html:has(.auth-page)),
+  :global(body:has(.auth-page)) {
+    min-block-size: 100%;
   }
 
-  .orb {
-    position: absolute;
-    border-radius: 999px;
-    filter: blur(80px);
-    will-change: transform;
-  }
-
-  .orb-1 {
-    inline-size: 600px; block-size: 600px;
-    inset-block-start: -200px; inset-inline-start: -150px;
-    background: radial-gradient(circle, rgba(30,58,95,0.9) 0%, transparent 70%);
-    animation: float-orb 18s ease-in-out infinite;
-  }
-
-  .orb-2 {
-    inline-size: 500px; block-size: 500px;
-    inset-block-end: -150px; inset-inline-end: -100px;
-    background: radial-gradient(circle, rgba(26,44,74,0.8) 0%, transparent 70%);
-    animation: float-orb 22s ease-in-out infinite reverse;
-  }
-
-  .orb-3 {
-    inline-size: 400px; block-size: 400px;
-    inset-block-start: 40%; inset-inline-start: 35%;
-    background: radial-gradient(circle, rgba(44,26,74,0.7) 0%, transparent 70%);
-    animation: float-orb 26s ease-in-out infinite 3s;
-  }
-
-  .orb-4 {
-    inline-size: 350px; block-size: 350px;
-    inset-block-start: 15%; inset-inline-end: 15%;
-    background: radial-gradient(circle, rgba(15,61,74,0.7) 0%, transparent 70%);
-    animation: float-orb 20s ease-in-out infinite 6s reverse;
-  }
-
-  @keyframes float-orb {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33%       { transform: translate(30px, -40px) scale(1.05); }
-    66%       { transform: translate(-20px, 25px) scale(0.97); }
-  }
-
-  /* Shell */
   .auth-shell {
-    position: relative;
-    z-index: 1;
-    inline-size: min(100%, 68rem);
     display: grid;
-    grid-template-columns: minmax(20rem, 1.1fr) minmax(22rem, 28rem);
-    border-radius: var(--radius-xl);
+    grid-template-columns: minmax(0, 1.04fr) minmax(22rem, 0.86fr);
+    inline-size: min(100%, 72rem);
+    min-block-size: min(42rem, calc(100dvh - clamp(2rem, 6vw, 4rem)));
     overflow: hidden;
-    box-shadow:
-      0 0 0 1px rgba(255,255,255,0.06),
-      0 40px 80px -20px rgba(0,0,0,0.5),
-      0 0 120px -40px rgba(78,135,255,0.12);
-    animation: shell-enter 0.5s cubic-bezier(0.16,1,0.3,1) both;
-  }
-
-  @keyframes shell-enter {
-    from { opacity: 0; transform: translateY(20px) scale(0.99); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    border: 1px solid rgba(218, 226, 238, 0.92);
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: none;
+    backdrop-filter: blur(18px);
   }
 
   /* Brand panel */
@@ -183,9 +127,11 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    background: linear-gradient(148deg, #0d1f3c 0%, #112244 25%, #0d2d3a 55%, #1a2040 80%, #0d1830 100%);
-    padding: clamp(2rem, 4vw, 3rem);
+    min-block-size: 0;
+    justify-content: center;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    background:
+      linear-gradient(155deg, rgba(239, 246, 255, 0.98) 0%, rgba(248, 252, 255, 0.96) 48%, rgba(255, 255, 255, 0.94) 100%);
   }
 
   .brand-panel::before {
@@ -193,65 +139,78 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 50% at 80% 20%, rgba(78,135,255,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 60% at 10% 80%, rgba(44,110,99,0.15) 0%, transparent 60%);
+      radial-gradient(ellipse 55% 45% at 85% 15%, rgba(78, 135, 255, 0.1) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 50% at 5% 90%, rgba(44, 110, 99, 0.08) 0%, transparent 55%);
     pointer-events: none;
   }
 
-  .brand-header { position: relative; z-index: 1; }
+  .brand-header {
+    position: relative;
+    z-index: 1;
+    margin-block-end: clamp(rem, 3vh, 2.25rem);
+  }
+
+  .brand-logo-image {
+  height: clamp(60px, 8vh, 120px);
+  width: auto;
+}
 
   .brand-logo {
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
   }
 
-  .logo-icon { color: #7ecfff; flex-shrink: 0; }
-
-  .logo-wordmark {
-    color: rgba(255,255,255,0.92);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+  .brand-logo-image {
+    display: block;
+    inline-size: auto;
+    block-size: 5rem;
+    max-inline-size: 12rem;
+    object-fit: contain;
   }
 
   .brand-body {
     position: relative;
     z-index: 1;
     display: grid;
-    gap: var(--space-lg);
-    margin-block: clamp(2.5rem, 6vw, 4rem) auto;
+    gap: clamp(0.8rem, 1.7vh, 1.2rem);
+    margin-block: 0;
+    max-inline-size: 34rem;
+    min-block-size: 0;
   }
 
   .brand-kicker {
     margin: 0;
-    color: rgba(126,207,255,0.7);
-    font-size: 0.72rem;
+    color: #5b8fd4;
+    font-size: 0.7rem;
     font-weight: 800;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
   .brand-headline {
     margin: 0;
-    color: #ffffff;
-    font-size: clamp(2rem, 4.5vw, 3.25rem);
+    color: #0f1923;
+    font-size: clamp(1.9rem, 3vw, 2.75rem);
     font-weight: 800;
-    line-height: 1.06;
+    line-height: 1.08;
     letter-spacing: -0.03em;
+  }
+
+  .brand-headline-accent {
+    color: var(--color-secondary);
   }
 
   .brand-desc {
     margin: 0;
-    max-inline-size: 30ch;
-    color: rgba(255,255,255,0.52);
+    max-inline-size: 65ch;
+    color: #526173;
     font-size: 0.95rem;
     line-height: 1.65;
   }
 
   .feature-list {
     display: grid;
-    gap: 0.75rem;
+    gap: 0.7rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -260,8 +219,8 @@
   .feature-item {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    color: rgba(255,255,255,0.75);
+    gap: 0.65rem;
+    color: #374151;
     font-size: 0.9rem;
     font-weight: 500;
   }
@@ -270,105 +229,106 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    inline-size: 1.4rem;
-    block-size: 1.4rem;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
     border-radius: 999px;
-    background: rgba(126,207,255,0.1);
-    color: #7ecfff;
-    border: 1px solid rgba(126,207,255,0.2);
+    background: rgba(78, 135, 255, 0.12);
+    color: var(--color-secondary);
+    border: 1px solid rgba(78, 135, 255, 0.22);
   }
 
-  /* Decorative rings */
-  .brand-deco {
-    position: absolute;
-    inset-block-end: -4rem;
-    inset-inline-end: -4rem;
-    inline-size: 22rem;
-    block-size: 22rem;
-    pointer-events: none;
-    z-index: 0;
+  .brand-illustration {
+    position: relative;
+    z-index: 1;
+    inline-size: min(100%, 20rem);
+    aspect-ratio: 16 / 9;
+    margin-block-start: clamp(1.25rem, 3vh, 2rem);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: none;
+    overflow: hidden;
   }
 
-  .deco-ring { position: absolute; inset: 0; border-radius: 999px; }
-  .r1 { border: 1px solid rgba(255,255,255,0.05); }
-  .r2 { inset: 2.5rem; border: 1px solid rgba(78,135,255,0.08); }
-  .r3 { inset: 5rem; border: 1px solid rgba(78,135,255,0.06); }
-
-  .deco-dots {
-    position: absolute;
-    inset: 4rem;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(4, 1fr);
-    gap: 0.6rem;
-    place-items: center;
-  }
-
-  .deco-dots span {
-    inline-size: 3px;
-    block-size: 3px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.1);
+  .brand-illustration img {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: contain;
+    object-position: center;
   }
 
   /* Auth card */
   .auth-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(248, 250, 252, 0.84));
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .auth-card-inner {
     display: grid;
-    align-content: center;
-    gap: var(--space-xl);
-    background: #ffffff;
-    padding: clamp(2rem, 5vw, 3.25rem);
+    gap: clamp(1rem, 2vh, 1.35rem);
+    inline-size: min(100%, 25.5rem);
+    margin-block: auto;
   }
 
   .mobile-brand {
     display: none;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--color-primary);
-    font-size: 0.95rem;
-    font-weight: 700;
   }
 
-  .mobile-brand .logo-icon { color: var(--color-secondary); }
+  .brand-logo-image--mobile {
+    block-size: 2.5rem;
+    max-inline-size: 10rem;
+  }
 
-  .form-header { display: grid; gap: 0.4rem; }
+  .form-header {
+    display: grid;
+    gap: 0.55rem;
+  }
 
   h1 {
     margin: 0;
-    color: var(--color-text);
-    font-size: clamp(1.6rem, 5vw, 2.1rem);
+    color: #0f1923;
+    font-size: clamp(1.85rem, 4vw, 2.35rem);
     font-weight: 800;
     letter-spacing: -0.03em;
-    line-height: 1.1;
+    line-height: 1.12;
   }
 
   .form-subtitle {
     margin: 0;
-    color: var(--color-muted);
+    color: #526173;
     font-size: 0.95rem;
-    line-height: 1.5;
+    line-height: 1.55;
   }
 
   /* Global helpers used by page-level components */
   :global(.auth-form) {
     display: grid;
-    gap: var(--space-md);
+    gap: 0.95rem;
   }
 
   :global(.auth-form-row) {
     display: flex;
     justify-content: flex-end;
+    margin-block-start: -0.25rem;
     font-size: 0.875rem;
   }
 
   :global(.auth-footer) {
     margin: 0;
-    border-block-start: 1px solid var(--color-border);
-    padding-block-start: var(--space-lg);
-    color: var(--color-muted);
+    padding-block-start: 0.25rem;
+    color: #526173;
     font-size: 0.9rem;
     text-align: center;
-    line-height: 1.5;
+    line-height: 1.55;
   }
 
   :global(.auth-card a) {
@@ -391,12 +351,18 @@
     font-size: 0.875rem;
     line-height: 1.5;
     font-weight: 500;
-    animation: alert-in 0.2s cubic-bezier(0.16,1,0.3,1) both;
+    animation: alert-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   @keyframes alert-in {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   :global(.auth-alert[data-variant='error']) {
@@ -411,23 +377,115 @@
     color: var(--color-success);
   }
 
-  /* Responsive */
-  @media (max-width: 800px) {
-    .auth-page { padding: 0; background: #ffffff; }
-    .bg-canvas { display: none; }
+  :global(.auth-card .password-field) {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  :global(.auth-card .button[data-variant='secondary']) {
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
+  :global(.auth-card .button[data-variant='secondary']:hover:not(:disabled)) {
+    box-shadow: none;
+  }
+
+  @media (max-height: 720px) {
     .auth-shell {
-      inline-size: 100%;
-      min-block-size: 100dvh;
-      grid-template-columns: 1fr;
-      border-radius: 0;
-      box-shadow: none;
+      min-block-size: auto;
     }
-    .brand-panel { display: none; }
-    .auth-card { align-content: start; padding: 2.5rem 1.5rem; }
-    .mobile-brand { display: flex; }
+
+    .brand-panel {
+      padding-block: 1.25rem;
+    }
+
+    .brand-header {
+      margin-block-end: 1rem;
+    }
+
+    .brand-desc {
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .feature-list {
+      gap: 0.5rem;
+    }
+
+    .brand-illustration {
+      aspect-ratio: 16 / 9;
+      margin-block-start: 1rem;
+    }
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .auth-page {
+      padding: clamp(1rem, 4vw, 1.5rem);
+    }
+
+    .auth-shell {
+      grid-template-columns: 1fr;
+      inline-size: min(100%, 32rem);
+      min-block-size: auto;
+      max-block-size: none;
+      border-radius: 24px;
+    }
+
+    .brand-panel {
+      display: none;
+    }
+
+    .auth-card {
+      align-items: center;
+      min-block-size: min(40rem, calc(100dvh - 2rem));
+      padding: clamp(1.5rem, 5vw, 2rem);
+      overflow: visible;
+    }
+
+    .auth-card-inner {
+      margin-block: auto;
+    }
+
+    .mobile-brand {
+      display: flex;
+    }
+  }
+
+  @media (max-width: 900px) and (max-height: 700px) {
+    .auth-page {
+      place-items: start center;
+    }
+
+    .auth-card {
+      align-items: flex-start;
+      min-block-size: auto;
+    }
+
+    .auth-card-inner {
+      margin-block: 0;
+    }
   }
 
   @media (max-width: 480px) {
-    .auth-card { padding: 2rem 1.25rem; }
+    .auth-page {
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .auth-shell {
+      inline-size: 100%;
+      min-block-size: 100dvh;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .auth-card {
+      min-block-size: 100dvh;
+      padding: 1.35rem 1rem;
+      background: #ffffff;
+    }
   }
 </style>

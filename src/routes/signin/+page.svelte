@@ -86,6 +86,8 @@
       name="email"
       label="Email"
       type="text"
+      leadingIcon="email"
+      appearance="auth"
       bind:value={form.email}
       error={errors.email}
       autocomplete="email"
@@ -103,6 +105,8 @@
       name="password"
       label="Password"
       type="password"
+      leadingIcon="password"
+      appearance="auth"
       bind:value={form.password}
       error={errors.password}
       autocomplete="current-password"
@@ -119,7 +123,7 @@
       <a href="/forgot-password">Forgot password?</a>
     </div>
 
-    <Button type="submit" size="lg" loading={isSubmitting}>
+    <Button type="submit" size="lg" variant="secondary" fullWidth loading={isSubmitting}>
       Sign in
     </Button>
   </form>

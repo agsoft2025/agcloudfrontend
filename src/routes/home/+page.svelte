@@ -9,7 +9,7 @@
     {
       id: 'one-to-one',
       label: 'One-to-One Call',
-      description: 'Direct call with a single user'
+      description: 'Secure encrypted line'
     }
   ];
 
@@ -137,7 +137,7 @@
     flex: 1;
     min-inline-size: 0;
     min-block-size: 0;
-    padding: clamp(1rem, 3vw, 2rem);
+    padding: clamp(0.75rem, 2vw, 1.5rem);
     overflow: auto;
   }
 

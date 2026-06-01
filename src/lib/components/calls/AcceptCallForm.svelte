@@ -101,29 +101,41 @@
     <Button
       type="submit"
       variant="secondary"
+      fullWidth
       loading={isSubmitting && action === 'accept'}
       disabled={isSubmitting}
     >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       Accept
     </Button>
 
     <Button
       type="button"
       variant="ghost"
+      fullWidth
       loading={isSubmitting && action === 'reject'}
       disabled={isSubmitting}
       on:click={() => handleCallAction('reject')}
     >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
       Decline
     </Button>
 
     <Button
       type="button"
       variant="danger"
+      fullWidth
       loading={isSubmitting && action === 'end'}
       disabled={isSubmitting}
       on:click={() => handleCallAction('end')}
     >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1A19.4 19.4 0 013.1 10.8 19.8 19.8 0 012.1 2.2 2 2 0 014.1 0h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8.1 7.9a16 16 0 006 6l1.2-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0122 14.9z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       End call
     </Button>
   </div>
@@ -134,7 +146,7 @@
 <style lang="postcss">
   .accept-form {
     display: grid;
-    gap: var(--space-md);
+    gap: 0.65rem;
   }
 
   .form-body {
@@ -144,13 +156,6 @@
 
   .actions {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--space-sm);
-  }
-
-  @media (max-width: 560px) {
-    .actions {
-      grid-template-columns: 1fr;
-    }
+    gap: 0.5rem;
   }
 </style>

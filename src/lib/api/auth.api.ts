@@ -56,6 +56,12 @@ export async function signIn(payload: SignInPayload) {
   return response.data;
 }
 
+export async function signOut() {
+  const response = await axiosClient.post<{ message?: string }>('/auth/signout');
+
+  return response.data;
+}
+
 export async function forgotPassword(payload: ForgotPasswordPayload) {
   const response = await axiosClient.post<ForgotPasswordResponse>('/auth/forgot-password', payload);
 

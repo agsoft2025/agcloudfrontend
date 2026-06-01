@@ -73,6 +73,8 @@
       name="displayName"
       label="Display name"
       type="text"
+      leadingIcon="user"
+      appearance="auth"
       bind:value={form.displayName}
       error={errors.displayName}
       autocomplete="name"
@@ -87,6 +89,8 @@
       name="email"
       label="Email"
       type="text"
+      leadingIcon="email"
+      appearance="auth"
       bind:value={form.email}
       error={errors.email}
       autocomplete="email"
@@ -102,6 +106,8 @@
         name="password"
         label="Password"
         type="password"
+        leadingIcon="password"
+        appearance="auth"
         bind:value={form.password}
         error={errors.password}
         autocomplete="new-password"
@@ -113,7 +119,7 @@
       <PasswordStrength password={form.password} />
     </div>
 
-    <Button type="submit" size="lg" loading={isSubmitting}>
+    <Button type="submit" size="lg" variant="secondary" fullWidth loading={isSubmitting}>
       Create account
     </Button>
   </form>
@@ -124,9 +130,3 @@
   </p>
 </AuthShell>
 
-<style>
-  .password-field {
-    display: grid;
-    gap: 0.5rem;
-  }
-</style>

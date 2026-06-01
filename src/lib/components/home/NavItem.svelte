@@ -2,15 +2,12 @@
   export let label: string;
   export let description = '';
   export let active = false;
-  export let collapsed = false;
 </script>
 
 <button
   class="nav-item"
   class:active
-  class:collapsed
   type="button"
-  title={collapsed ? label : undefined}
   aria-current={active ? 'page' : undefined}
   on:click
 >
@@ -18,13 +15,15 @@
     <slot name="icon" />
   </span>
 
-  {#if !collapsed}
-    <span class="nav-copy">
-      <span class="nav-label">{label}</span>
-      {#if description}
-        <small class="nav-desc">{description}</small>
-      {/if}
-    </span>
+  <span class="nav-copy">
+    <span class="nav-label">{label}</span>
+    {#if description}
+      <small class="nav-desc">{description}</small>
+    {/if}
+  </span>
+
+  {#if active}
+    <span class="nav-active-dot" aria-hidden="true"></span>
   {/if}
 </button>
 
@@ -34,13 +33,13 @@
     align-items: center;
     gap: 0.75rem;
     inline-size: 100%;
-    min-block-size: 2.5rem;
+    min-block-size: 3.25rem;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: 12px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.65);
+    color: rgba(255, 255, 255, 0.72);
     font-family: var(--font-sans);
-    padding: 0.375rem 0.625rem;
+    padding: 0.625rem 0.75rem;
     text-align: start;
     cursor: pointer;
     position: relative;
@@ -49,52 +48,28 @@
       color 140ms ease;
   }
 
-  /* Active indicator bar */
-  .nav-item::before {
-    content: '';
-    position: absolute;
-    inset-block: 20% 20%;
-    inset-inline-start: -8px;
-    inline-size: 2.5px;
-    border-radius: 999px;
-    background: var(--color-secondary);
-    opacity: 0;
-    transform: scaleY(0.4);
-    transition:
-      opacity 160ms ease,
-      transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
   .nav-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.92);
   }
 
   .nav-item:focus-visible {
-    outline: 2px solid rgba(78, 135, 255, 0.6);
-    outline-offset: 1px;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.88);
+    outline: 2px solid rgba(78, 135, 255, 0.65);
+    outline-offset: 2px;
   }
 
   .nav-item.active {
-    background: rgba(78, 135, 255, 0.14);
-    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
   }
 
-  .nav-item.active::before {
-    opacity: 1;
-    transform: scaleY(1);
-  }
-
-  /* Icon */
   .nav-icon {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    inline-size: 1.375rem;
-    block-size: 1.375rem;
-    color: inherit;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.55);
     transition: color 140ms ease;
   }
 
@@ -102,40 +77,34 @@
     color: var(--color-secondary);
   }
 
-  /* Collapsed: center icon */
-  .nav-item.collapsed {
-    justify-content: center;
-    padding: 0.375rem;
-  }
-
-  .nav-item.collapsed .nav-icon {
-    inline-size: 1.25rem;
-    block-size: 1.25rem;
-  }
-
-  /* Copy */
   .nav-copy {
     display: grid;
-    gap: 0.1rem;
+    gap: 0.15rem;
+    flex: 1;
     min-inline-size: 0;
-    overflow: hidden;
+    text-align: start;
   }
 
   .nav-label {
     font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-weight: 700;
+    line-height: 1.25;
+    color: inherit;
   }
 
   .nav-desc {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.42);
+    font-weight: 400;
+    color: #9ca3af;
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+
+  .nav-active-dot {
+    flex-shrink: 0;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-radius: 999px;
+    background: var(--color-secondary);
+    box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.22);
   }
 </style>

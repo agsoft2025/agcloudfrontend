@@ -69,6 +69,11 @@
   --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
 
+  /* Auth surfaces */
+  --auth-panel-gradient: linear-gradient(165deg, #eef4ff 0%, #f5f9ff 42%, #fafcff 72%, #ffffff 100%);
+  --auth-input-bg: #eef3f9;
+  --auth-input-radius: 10px;
+
   /* Pico overrides */
   --pico-font-family: var(--font-sans);
   --pico-primary: var(--color-primary);
