@@ -3,6 +3,7 @@
 
   export interface ActiveCallSession {
     callId: string | null;
+    callMode: 'one-to-one' | 'conference';
     callType: CallType;
     recipients: string[];
     initiatedAt: Date;
@@ -818,8 +819,6 @@
     padding-block: 0.875rem;
     box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35);
   }
-
-  .ctrl-btn.ctrl-end span { color: rgba(255, 255, 255, 0.85); }
 
   .ctrl-btn.ctrl-end:hover:not(:disabled) {
     background: #b91c1c;

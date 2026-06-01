@@ -7,11 +7,12 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import Button from '$lib/components/atoms/Button.svelte';
-  import { Track } from 'livekit-client';
+  import { RoomEvent, Track, type RemoteParticipant, type Room } from 'livekit-client';
   import Input from '$lib/components/atoms/Input.svelte';
   import {
     getCallApiErrorMessage,
     getCallIdentifier,
+    getCall,
     hasLiveKitCredentials,
     endCall,
     initiateCall,
@@ -38,6 +39,8 @@
   let activeSession: ActiveCallSession | null = null;
   let videoAvailable = true;
   let cleanupCallEvents: (() => void) | null = null;
+  let cleanupOneToOneEndEvents: (() => void) | null = null;
+  let callStatusInterval: ReturnType<typeof setInterval> | null = null;
 
   onDestroy(() => {
     cleanupLiveKit();
@@ -80,6 +83,8 @@
     if (!hasLiveKitCredentials(response)) return null;
     cleanupCallEvents?.();
     cleanupCallEvents = null;
+    cleanupOneToOneEndEvents?.();
+    cleanupOneToOneEndEvents = null;
     const requestedVideo = (response.call?.callType ?? fallbackCallType) === 'video';
     const room = await liveKitClient.connect({
       token: response.token,
@@ -102,17 +107,79 @@
       const remoteTracks = p.getTrackPublications();
       console.log('Remote participant', p.identity, 'tracks:', remoteTracks.map((t) => t.kind + ':' + t.source));
     });
+    cleanupOneToOneEndEvents = bindOneToOneEndEvents(room);
     const finalRoomName = response.roomName || `room-${Date.now()}`;
     return { roomName: finalRoomName, callType: requestedVideo && videoAvailable ? 'video' : 'audio' };
   }
 
   async function cleanupLiveKit() {
+    stopCallStatusMonitor();
     cleanupCallEvents?.();
     cleanupCallEvents = null;
+    cleanupOneToOneEndEvents?.();
+    cleanupOneToOneEndEvents = null;
     activeSession = null;
     videoAvailable = true;
     await liveKitClient.disconnect();
     callStore.reset();
+  }
+
+  function startCallStatusMonitor(callId: string | null) {
+    stopCallStatusMonitor();
+    if (!callId) return;
+
+    callStatusInterval = setInterval(async () => {
+      try {
+        const response = await getCall(callId);
+        const status = response.call?.status;
+
+        if (status && !['initiated', 'active'].includes(status)) {
+          await cleanupLiveKit();
+          setStatus('Call ended.', 'info');
+        }
+      } catch (error) {
+        await cleanupLiveKit();
+        setStatus(getCallApiErrorMessage(error, 'Call is no longer available.'), 'info');
+      }
+    }, 5000);
+  }
+
+  function stopCallStatusMonitor() {
+    if (!callStatusInterval) return;
+    clearInterval(callStatusInterval);
+    callStatusInterval = null;
+  }
+
+  function bindOneToOneEndEvents(room: Room) {
+    const endBecausePeerLeft = async (_participant: RemoteParticipant) => {
+      const session = activeSession;
+      if (!session || session.callMode !== 'one-to-one') return;
+
+      if (session.callId) {
+        endCall(session.callId).catch((error) => {
+          console.warn('Unable to notify backend that peer left the call.', error);
+        });
+      }
+
+      await cleanupLiveKit();
+      setStatus('Call ended because the other participant left.', 'info');
+    };
+
+    const endBecauseRoomClosed = async () => {
+      if (!activeSession) return;
+      await cleanupLiveKit();
+      setStatus('Call ended.', 'info');
+    };
+
+    room
+      .on(RoomEvent.ParticipantDisconnected, endBecausePeerLeft)
+      .on(RoomEvent.Disconnected, endBecauseRoomClosed);
+
+    return () => {
+      room
+        .off(RoomEvent.ParticipantDisconnected, endBecausePeerLeft)
+        .off(RoomEvent.Disconnected, endBecauseRoomClosed);
+    };
   }
 
   async function handleAcceptedCall(event: CustomEvent<AcceptCallResponse & { requestedCallId: string }>) {
@@ -123,11 +190,13 @@
       const callId = getCallIdentifier(response) ?? response.requestedCallId;
       activeSession = {
         callId,
+        callMode: response.call?.callMode ?? 'one-to-one',
         callType: liveKitSession?.callType ?? response.call?.callType ?? 'video',
         recipients: [response.call?.callerId ?? 'Caller'],
         initiatedAt: new Date(),
         roomName: liveKitSession?.roomName ?? response.roomName
       };
+      startCallStatusMonitor(callId);
       setStatus(response.message ?? 'Call accepted successfully.', 'success');
     } catch (apiError) {
       setStatus(getErrorMessage(apiError, 'Call accepted, but LiveKit could not connect.'), 'error');
@@ -152,11 +221,13 @@
       }
       activeSession = {
         callId,
+        callMode,
         callType: liveKitSession?.callType ?? callType,
         recipients: validatedReceiverIds,
         initiatedAt: new Date(),
         roomName: liveKitSession?.roomName ?? response.roomName
       };
+      startCallStatusMonitor(callId);
       if (liveKitError) {
         setStatus(liveKitError, 'error');
       } else {

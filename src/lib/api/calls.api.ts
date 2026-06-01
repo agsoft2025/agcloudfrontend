@@ -95,6 +95,15 @@ export async function rejectCall(callId: string) {
   return response.data;
 }
 
+export async function getCall(callId: string) {
+  const response = await axiosClient.get<{ call: CallSummary }>(
+    `/calls/${encodeURIComponent(callId)}`,
+    getAuthRequestConfig()
+  );
+
+  return response.data;
+}
+
 export async function endCall(callId: string) {
   const response = await axiosClient.post<EndCallResponse>(
     `/calls/${encodeURIComponent(callId)}/end`,

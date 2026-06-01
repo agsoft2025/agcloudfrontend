@@ -277,15 +277,6 @@
     gap: 0.375rem;
   }
 
-  .section-label {
-    margin: 0 0 0.375rem 0.5rem;
-    color: #9ca3af;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
   .sidebar-footer {
     display: flex;
     align-items: center;

@@ -293,7 +293,6 @@
     animation: err-in 0.15s ease both;
   }
 
-  .error-msg .icon-svg,
   .error-msg > svg { flex-shrink: 0; margin-block-start: 0.1rem; }
 
   @keyframes err-in {
