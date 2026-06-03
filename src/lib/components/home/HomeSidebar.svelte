@@ -218,8 +218,6 @@
     justify-content: center;
     gap: 0  .75rem;
     flex-shrink: 0;
-    background-color: var(--sidebar-header-bg);
-    opacity: 0.6;
   }
 
   .brand {
@@ -245,7 +243,7 @@
     border: none;
     border-radius: 8px;
     background: transparent;
-    color: #9ca3af;
+    color: var(--sidebar-control-color);
     cursor: pointer;
     padding: 0;
     transition:
@@ -254,12 +252,12 @@
   }
 
   .icon-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e5e7eb;
+    background: var(--sidebar-control-hover-bg);
+    color: var(--sidebar-control-hover-color);
   }
 
   .icon-btn:focus-visible {
-    outline: 2px solid rgba(78, 135, 255, 0.65);
+    outline: 2px solid var(--color-secondary);
     outline-offset: 2px;
   }
 
@@ -270,7 +268,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+    scrollbar-color: var(--sidebar-border) transparent;
   }
 
   .nav-section {
@@ -303,8 +301,8 @@
     inline-size: 2.25rem;
     block-size: 2.25rem;
     border-radius: 999px;
-    background: #374151;
-    color: #ffffff;
+    background: var(--sidebar-user-avatar-bg);
+    color: var(--sidebar-user-avatar-color);
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -328,7 +326,7 @@
   }
 
   .user-plan {
-    color: #9ca3af;
+    color: var(--sidebar-muted);
     font-size: 0.75rem;
     line-height: 1.25;
     white-space: nowrap;
@@ -345,7 +343,7 @@
     border: none;
     border-radius: 8px;
     background: transparent;
-    color: #9ca3af;
+    color: var(--sidebar-control-color);
     cursor: pointer;
     padding: 0;
     transition:
@@ -354,12 +352,12 @@
   }
 
   .logout-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: #e5e7eb;
+    background: var(--sidebar-control-hover-bg);
+    color: var(--sidebar-control-hover-color);
   }
 
   .logout-btn:focus-visible {
-    outline: 2px solid rgba(78, 135, 255, 0.65);
+    outline: 2px solid var(--color-secondary);
     outline-offset: 2px;
   }
 

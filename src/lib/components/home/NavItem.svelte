@@ -39,7 +39,7 @@
     border: none;
     border-radius: 12px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.72);
+    color: var(--sidebar-text);
     font-family: var(--font-sans);
     padding: 0.625rem 0.75rem;
     text-align: start;
@@ -66,35 +66,35 @@
     inset-inline-start: 0;
     inline-size: 3px;
     border-radius: 0 999px 999px 0;
-    background: linear-gradient(180deg, #7ecfff 0%, var(--color-secondary) 100%);
-    box-shadow: 0 0 14px rgba(126, 207, 255, 0.75);
+    background: linear-gradient(180deg, var(--sidebar-accent) 0%, var(--color-secondary) 100%);
+    box-shadow: 0 0 14px var(--sidebar-accent-glow);
   }
 
   .nav-item::after {
     inset: 0;
     z-index: -1;
     background:
-      radial-gradient(circle at 16% 18%, rgba(126, 207, 255, 0.22), transparent 34%),
-      linear-gradient(135deg, rgba(78, 135, 255, 0.24), rgba(255, 255, 255, 0.08));
+      radial-gradient(circle at 16% 18%, var(--sidebar-accent-glow), transparent 34%),
+      linear-gradient(135deg, var(--sidebar-hover-bg), var(--sidebar-active-sheen));
   }
 
   .nav-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.92);
+    background: var(--sidebar-hover-bg);
+    color: var(--sidebar-text-active);
     transform: translateX(2px);
   }
 
   .nav-item:focus-visible {
-    outline: 2px solid rgba(78, 135, 255, 0.65);
+    outline: 2px solid var(--color-secondary);
     outline-offset: 2px;
   }
 
   .nav-item.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-text-active);
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 10px 24px rgba(0, 0, 0, 0.16);
+      inset 0 0 0 1px var(--sidebar-active-border),
+      var(--shadow-sm);
   }
 
   .nav-item.active::before,
@@ -108,7 +108,7 @@
     flex-shrink: 0;
     inline-size: 1.25rem;
     block-size: 1.25rem;
-    color: rgba(255, 255, 255, 0.55);
+    color: var(--sidebar-icon-color);
     border-radius: 8px;
     transition:
       background-color 140ms ease,
@@ -117,13 +117,12 @@
   }
 
   .nav-item.active .nav-icon {
-    /* background: rgba(255, 255, 255, 0.14); */
-    color: #7ecfff;
+    color: var(--sidebar-icon-active);
     transform: scale(1.04);
   }
 
   .nav-item.active .nav-desc {
-    color: rgba(255, 255, 255, 0.68);
+    color: var(--sidebar-muted);
   }
 
   .nav-copy {
@@ -144,7 +143,7 @@
   .nav-desc {
     font-size: 0.75rem;
     font-weight: 400;
-    color: #9ca3af;
+    color: var(--sidebar-muted);
     line-height: 1.3;
   }
 
@@ -153,9 +152,9 @@
     inline-size: 0.5rem;
     block-size: 0.5rem;
     border-radius: 999px;
-    background: #7ecfff;
+    background: var(--sidebar-accent);
     box-shadow:
-      0 0 0 3px rgba(126, 207, 255, 0.16),
-      0 0 16px rgba(126, 207, 255, 0.72);
+      0 0 0 3px color-mix(in srgb, var(--sidebar-accent) 16%, transparent),
+      0 0 16px var(--sidebar-accent-glow);
   }
 </style>
