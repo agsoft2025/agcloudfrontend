@@ -129,7 +129,7 @@
   .field {
     --control-height: 2.875rem;
     --icon-gutter: 2.875rem;
-    --icon-color: #9ca3af;
+    --icon-color: var(--color-subtle);
     --field-label-gap: 0.375rem;
     --field-message-gap: 0.375rem;
     display: grid;
@@ -161,7 +161,7 @@
   }
 
   .appearance-auth .label {
-    color: #0f1923;
+    color: var(--color-text);
     font-size: 0.8125rem;
     font-weight: 700;
   }
@@ -220,7 +220,7 @@
   .has-toggle .input { padding-inline-end: var(--icon-gutter) !important; }
   .has-leading-icon:not(.has-toggle) .input { padding-inline-end: 0.875rem !important; }
 
-  /* Pico applies padding + invalid icon; keep our layout */
+  /* Pico applies padding + invalid icon; override to keep our layout */
   .input[aria-invalid] {
     background-image: none !important;
     background-position: unset !important;
@@ -232,18 +232,19 @@
   .has-toggle .input[aria-invalid] { padding-inline-end: var(--icon-gutter) !important; }
   .has-leading-icon:not(.has-toggle) .input[aria-invalid] { padding-inline-end: 0.875rem !important; }
 
+  /* Auth appearance — uses theme tokens for dark mode */
   .appearance-auth .input {
     border: 1px solid transparent;
     border-radius: 10px;
-    background: #eef3f9;
+    background: var(--auth-input-bg);
   }
 
-  .appearance-auth .input:hover:not(:disabled) { background: #e8eef6; }
+  .appearance-auth .input:hover:not(:disabled) { background: var(--auth-input-bg-hover); }
 
   .appearance-auth .input:focus {
     border-color: var(--color-secondary);
-    background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.14);
+    background: var(--color-surface);
+    box-shadow: 0 0 0 3px var(--focus-ring-color);
   }
 
   .input::placeholder { color: var(--color-subtle); opacity: 1; }
@@ -252,17 +253,17 @@
   .input:focus {
     border-color: var(--color-secondary);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(78, 135, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 0 0 3px var(--focus-ring-color), 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
   .input:disabled { cursor: not-allowed; opacity: 0.55; background: var(--color-surface-raised); }
 
-  .has-error .input { border-color: var(--color-error); background: rgba(220, 38, 38, 0.02); }
-  .appearance-auth.has-error .input { background: #fef8f8; }
+  .has-error .input { border-color: var(--color-error); background: var(--color-error-bg); }
+  .appearance-auth.has-error .input { background: var(--color-error-bg); }
 
   .has-error .input:focus {
     border-color: var(--color-error);
-    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14), 0 1px 2px rgba(0, 0, 0, 0.04);
   }
 
   .toggle-visibility {
@@ -277,7 +278,7 @@
   }
 
   .toggle-visibility:hover { color: var(--color-muted); }
-  .toggle-visibility:focus-visible { outline: 2px solid var(--color-secondary); outline-offset: 1px; }
+  .toggle-visibility:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
   .hint { margin: 0; color: var(--color-subtle); font-size: 0.8125rem; line-height: 1.35; }
 
@@ -293,6 +294,7 @@
     animation: err-in 0.15s ease both;
   }
 
+  .error-msg .icon-svg,
   .error-msg > svg { flex-shrink: 0; margin-block-start: 0.1rem; }
 
   @keyframes err-in {

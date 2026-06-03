@@ -1,12 +1,18 @@
 <script lang="ts">
   import '../app.css';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth.store';
+  import { themeStore } from '$lib/stores/theme.store';
 
-  // Re-read persisted session from localStorage on every page mount.
-  // Keeps auth state accurate after a hard refresh.
   onMount(() => {
+    // Re-read auth session from localStorage (handles hard refresh)
     authStore.initialize();
+    // Start theme manager: reads localStorage, subscribes to OS changes
+    themeStore.initialize();
+  });
+
+  onDestroy(() => {
+    themeStore.destroy();
   });
 </script>
 

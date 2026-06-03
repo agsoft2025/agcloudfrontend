@@ -56,8 +56,8 @@
   }
 
   .status[data-variant='info'] {
-    border: 1px solid rgba(78, 135, 255, 0.22);
-    background: rgba(78, 135, 255, 0.06);
+    border: 1px solid var(--call-status-info-border);
+    background: var(--call-status-info-bg);
     color: var(--color-secondary);
   }
 

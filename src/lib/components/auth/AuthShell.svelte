@@ -2,6 +2,7 @@
   export let title: string;
   export let subtitle: string;
   export let eyebrow = 'AG Cloud';
+  import ThemeToggle from '$lib/components/atoms/ThemeToggle.svelte';
 </script>
 
 <div class="auth-page" role="main">
@@ -76,7 +77,8 @@
 
     <div class="auth-card">
       <div class="auth-card-inner">
-        <div class="mobile-brand" aria-hidden="true">
+        <div class="auth-card-topbar" aria-hidden="true"><ThemeToggle size="sm" /></div>
+      <div class="mobile-brand" aria-hidden="true">
           <img class="brand-logo-image brand-logo-image--mobile" src="/logo.png" alt="" />
         </div>
 
@@ -98,9 +100,7 @@
     place-items: center;
     min-block-size: 100dvh;
     background:
-      radial-gradient(circle at 12% 14%, rgba(78, 135, 255, 0.12) 0, transparent 24rem),
-      radial-gradient(circle at 88% 86%, rgba(44, 110, 99, 0.1) 0, transparent 24rem),
-      linear-gradient(135deg, #f8fafc 0%, #eef5f4 100%);
+      var(--auth-page-gradient);
     overflow: auto;
   }
 
@@ -115,9 +115,9 @@
     inline-size: min(100%, 72rem);
     min-block-size: min(42rem, calc(100dvh - clamp(2rem, 6vw, 4rem)));
     overflow: hidden;
-    border: 1px solid rgba(218, 226, 238, 0.92);
+    border: 1px solid var(--auth-shell-border);
     border-radius: 28px;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--auth-shell-bg);
     box-shadow: none;
     backdrop-filter: blur(18px);
   }
@@ -130,8 +130,7 @@
     min-block-size: 0;
     justify-content: center;
     padding: clamp(1.5rem, 3vw, 2.5rem);
-    background:
-      linear-gradient(155deg, rgba(239, 246, 255, 0.98) 0%, rgba(248, 252, 255, 0.96) 48%, rgba(255, 255, 255, 0.94) 100%);
+    background: var(--auth-brand-bg);
   }
 
   .brand-panel::before {
@@ -180,7 +179,7 @@
 
   .brand-kicker {
     margin: 0;
-    color: #5b8fd4;
+    color: var(--auth-brand-kicker);
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.12em;
@@ -189,7 +188,7 @@
 
   .brand-headline {
     margin: 0;
-    color: #0f1923;
+    color: var(--auth-brand-text);
     font-size: clamp(1.9rem, 3vw, 2.75rem);
     font-weight: 800;
     line-height: 1.08;
@@ -203,7 +202,7 @@
   .brand-desc {
     margin: 0;
     max-inline-size: 65ch;
-    color: #526173;
+    color: var(--auth-brand-desc);
     font-size: 0.95rem;
     line-height: 1.65;
   }
@@ -220,7 +219,7 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    color: #374151;
+    color: var(--auth-feature-text);
     font-size: 0.9rem;
     font-weight: 500;
   }
@@ -232,9 +231,9 @@
     inline-size: 1.5rem;
     block-size: 1.5rem;
     border-radius: 999px;
-    background: rgba(78, 135, 255, 0.12);
+    background: color-mix(in srgb, var(--color-secondary) 12%, transparent);
     color: var(--color-secondary);
-    border: 1px solid rgba(78, 135, 255, 0.22);
+    border: 1px solid color-mix(in srgb, var(--color-secondary) 22%, transparent);
   }
 
   .brand-illustration {
@@ -243,9 +242,9 @@
     inline-size: min(100%, 20rem);
     aspect-ratio: 16 / 9;
     margin-block-start: clamp(1.25rem, 3vh, 2rem);
-    border: 1px solid rgba(226, 232, 240, 0.9);
+    border: 1px solid var(--auth-illustration-border);
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.86);
+    background: var(--auth-illustration-bg);
     box-shadow: none;
     overflow: hidden;
   }
@@ -264,8 +263,7 @@
     align-items: center;
     justify-content: center;
     min-block-size: 0;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(248, 250, 252, 0.84));
+    background: var(--auth-card-gradient);
     padding: clamp(1.5rem, 3vw, 2.5rem);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -295,7 +293,7 @@
 
   h1 {
     margin: 0;
-    color: #0f1923;
+    color: var(--color-text);
     font-size: clamp(1.85rem, 4vw, 2.35rem);
     font-weight: 800;
     letter-spacing: -0.03em;
@@ -304,7 +302,7 @@
 
   .form-subtitle {
     margin: 0;
-    color: #526173;
+    color: var(--color-muted);
     font-size: 0.95rem;
     line-height: 1.55;
   }
@@ -325,7 +323,7 @@
   :global(.auth-footer) {
     margin: 0;
     padding-block-start: 0.25rem;
-    color: #526173;
+    color: var(--color-muted);
     font-size: 0.9rem;
     text-align: center;
     line-height: 1.55;
@@ -471,7 +469,7 @@
   @media (max-width: 480px) {
     .auth-page {
       padding: 0;
-      background: #ffffff;
+      background: var(--auth-card-bg);
     }
 
     .auth-shell {
@@ -485,7 +483,14 @@
     .auth-card {
       min-block-size: 100dvh;
       padding: 1.35rem 1rem;
-      background: #ffffff;
+      background: var(--auth-card-bg);
     }
   }
+
+  .auth-card-topbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-block-end: -0.5rem;
+  }
+
 </style>

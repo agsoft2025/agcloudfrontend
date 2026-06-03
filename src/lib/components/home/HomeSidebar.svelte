@@ -14,6 +14,7 @@
   import { signOut } from '$lib/api/auth.api';
   import { authStore, type AuthUser } from '$lib/stores/auth.store';
   import { userStore } from '$lib/stores/user.store';
+  import ThemeToggle from '$lib/components/atoms/ThemeToggle.svelte';
 
   export let items: HomeSidebarItem[] = [];
   export let selected: HomeSection;
@@ -152,6 +153,8 @@
       </div>
     </div>
 
+    <ThemeToggle size="sm" />
+
     <button
       class="logout-btn"
       type="button"
@@ -176,8 +179,7 @@
 <style lang="postcss">
   .sidebar {
     --sidebar-width: 280px;
-    --sidebar-bg: #111827;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
+    /* Sidebar colours come from themes.css — see --sidebar-bg, --sidebar-border */
     --sidebar-transition: 260ms cubic-bezier(0.16, 1, 0.3, 1);
 
     position: sticky;
@@ -216,7 +218,7 @@
     justify-content: center;
     gap: 0  .75rem;
     flex-shrink: 0;
-    background-color: #F2F2F2;
+    background-color: var(--sidebar-header-bg);
     opacity: 0.6;
   }
 
@@ -316,7 +318,7 @@
 
   .user-name {
     margin: 0;
-    color: #ffffff;
+    color: var(--sidebar-user-name);
     font-size: 0.875rem;
     font-weight: 700;
     line-height: 1.25;

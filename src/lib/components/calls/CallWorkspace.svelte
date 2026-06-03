@@ -472,15 +472,15 @@
     block-size: 2.5rem;
     flex-shrink: 0;
     border-radius: 12px;
-    background: #e9efff;
-    border: 1px solid #dce6ff;
-    color: #1d5bd8;
+    background: var(--call-info-badge-bg);
+    border: 1px solid var(--call-info-badge-border);
+    color: var(--call-info-badge-color);
   }
 
   .workspace-eyebrow,
   .panel-eyebrow {
     margin: 0;
-    color: #64748b;
+    color: var(--color-muted);
     font-size: 0.6875rem;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -489,7 +489,7 @@
 
   h2 {
     margin: 0;
-    color: #070b18;
+    color: var(--call-info-header-color);
     font-size: clamp(1.35rem, 2vw, 1.75rem);
     font-weight: 800;
     line-height: 1.2;
@@ -506,10 +506,10 @@
     align-items: center;
     gap: 0.45rem;
     min-block-size: 2rem;
-    border: 1px solid rgba(203, 213, 225, 0.78);
+    border: 1px solid var(--call-card-border);
     border-radius: var(--radius-full);
-    background: rgba(255, 255, 255, 0.82);
-    color: #0f172a;
+    background: var(--call-card-bg);
+    color: var(--call-room-input-color);
     font-size: 0.75rem;
     font-weight: 800;
     padding: 0.25rem 0.875rem;
@@ -529,15 +529,12 @@
     display: grid;
     gap: 1rem;
     block-size: 100%;
-    border: 1px solid rgba(218, 226, 238, 0.92);
+    border: 1px solid var(--call-card-border);
     border-radius: 22px;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.92)),
-      var(--color-surface);
+    background: var(--call-panel-bg);
     padding: clamp(1rem, 2vw, 1.35rem);
     box-shadow:
-      0 24px 70px rgba(15, 23, 42, 0.08),
-      0 2px 4px rgba(15, 23, 42, 0.04);
+      var(--call-card-shadow);
     margin: 0;
   }
 
@@ -568,20 +565,20 @@
   }
 
   .panel-head-icon.outbound {
-    background: #e8edff;
-    border: 1px solid #dce5ff;
-    color: #1d5bd8;
+    background: var(--call-info-badge-bg);
+    border: 1px solid var(--call-info-badge-border);
+    color: var(--call-info-badge-color);
   }
 
   .panel-head-icon.inbound {
-    background: #dcfce7;
-    border: 1px solid #bbf7d0;
-    color: #16a34a;
+    background: var(--call-ok-badge-bg);
+    border: 1px solid var(--call-ok-badge-border);
+    color: var(--call-ok-badge-color);
   }
 
   h3 {
     margin: 0;
-    color: #070b18;
+    color: var(--call-info-header-color);
     font-size: 1.12rem;
     font-weight: 800;
     line-height: 1.2;
@@ -598,7 +595,7 @@
   }
 
   .field-label {
-    color: #0f172a;
+    color: var(--call-room-input-color);
     font-size: 0.78rem;
     font-weight: 800;
     line-height: 1.3;
@@ -613,10 +610,10 @@
   .styled-select {
     inline-size: 100%;
     min-block-size: 2.7rem;
-    border: 1.5px solid #cfd8e6;
+    border: 1.5px solid var(--call-room-input-border);
     border-radius: 12px;
-    background: #ffffff;
-    color: #0f172a;
+    background: var(--call-room-input-bg);
+    color: var(--call-room-input-color);
     font-family: var(--font-sans);
     font-size: 0.9rem;
     font-weight: 600;
@@ -630,7 +627,7 @@
   }
 
   .styled-select:hover:not(:disabled) {
-    border-color: #9aa9bc;
+    border-color: var(--call-room-input-border-strong);
   }
 
   .styled-select:focus {
@@ -642,7 +639,7 @@
   .styled-select:disabled {
     cursor: not-allowed;
     opacity: 0.55;
-    background: #f8fafc;
+    background: var(--call-room-disabled-bg);
   }
 
   .select-caret {
@@ -650,7 +647,7 @@
     inset-inline-end: 0.75rem;
     display: grid;
     place-items: center;
-    color: #64748b;
+    color: var(--color-muted);
     pointer-events: none;
   }
 
@@ -658,7 +655,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #334155;
+    color: var(--call-room-label-color);
     font-size: 0.86rem;
     font-weight: 600;
     cursor: pointer;
@@ -669,7 +666,7 @@
     inline-size: 1rem;
     block-size: 1rem;
     flex-shrink: 0;
-    border: 1.5px solid #94a3b8;
+    border: 1.5px solid var(--color-border-strong);
     border-radius: 5px;
     cursor: pointer;
     accent-color: var(--color-secondary);
@@ -827,13 +824,13 @@
 
   :global(.panel .input) {
     min-block-size: 2.7rem;
-    border-color: #cfd8e6;
+    border-color: var(--call-room-input-border);
     border-radius: 12px;
-    background: #ffffff;
+    background: var(--call-room-input-bg);
   }
 
   :global(.panel .label) {
-    color: #0f172a;
+    color: var(--call-room-input-color);
     font-size: 0.78rem;
     font-weight: 800;
   }

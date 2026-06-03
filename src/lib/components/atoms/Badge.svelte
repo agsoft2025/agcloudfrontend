@@ -35,8 +35,8 @@
 <style lang="postcss">
   .badge {
     --badge-background: var(--color-border);
-    --badge-color: var(--color-text);
-    --badge-border: transparent;
+    --badge-color:      var(--color-text);
+    --badge-border:     transparent;
 
     display: inline-flex;
     align-items: center;
@@ -64,33 +64,34 @@
   }
 
   .badge[data-variant='primary'] {
-    --badge-background: color-mix(in srgb, var(--color-primary) 12%, white);
-    --badge-color: var(--color-primary);
-    --badge-border: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    --badge-background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    --badge-color:      var(--color-primary);
+    --badge-border:     color-mix(in srgb, var(--color-primary) 22%, transparent);
   }
 
+  /* Semantic variants consume theme tokens — auto-adapt to dark mode */
   .badge[data-variant='success'] {
-    --badge-background: #dcfae6;
-    --badge-color: #067647;
-    --badge-border: #abefc6;
+    --badge-background: var(--badge-success-bg);
+    --badge-color:      var(--badge-success-color);
+    --badge-border:     var(--badge-success-border);
   }
 
   .badge[data-variant='warning'] {
-    --badge-background: #fef0c7;
-    --badge-color: #b54708;
-    --badge-border: #fedf89;
+    --badge-background: var(--badge-warning-bg);
+    --badge-color:      var(--badge-warning-color);
+    --badge-border:     var(--badge-warning-border);
   }
 
   .badge[data-variant='danger'] {
-    --badge-background: #fee4e2;
-    --badge-color: #b42318;
-    --badge-border: #fecdca;
+    --badge-background: var(--badge-danger-bg);
+    --badge-color:      var(--badge-danger-color);
+    --badge-border:     var(--badge-danger-border);
   }
 
   .badge[data-variant='info'] {
-    --badge-background: color-mix(in srgb, var(--color-secondary) 14%, white);
-    --badge-color: #175cd3;
-    --badge-border: color-mix(in srgb, var(--color-secondary) 28%, transparent);
+    --badge-background: color-mix(in srgb, var(--color-secondary) 14%, transparent);
+    --badge-color:      var(--badge-info-color);
+    --badge-border:     color-mix(in srgb, var(--color-secondary) 28%, transparent);
   }
 
   .badge.is-dot {

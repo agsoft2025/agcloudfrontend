@@ -69,9 +69,7 @@
   .app-layout {
     display: flex;
     min-block-size: 100dvh;
-    background:
-      radial-gradient(circle at 85% 8%, rgba(78, 135, 255, 0.07) 0%, transparent 28rem),
-      linear-gradient(135deg, #f8fafc 0%, #f0f7f5 100%);
+    background: var(--home-layout-bg);
   }
 
   .content-shell {
@@ -89,7 +87,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    background: #ffffff;
+    background: var(--color-surface);
     border-block-end: 1px solid var(--color-border);
     flex-shrink: 0;
   }

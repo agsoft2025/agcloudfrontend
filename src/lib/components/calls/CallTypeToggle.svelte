@@ -72,7 +72,7 @@
   }
 
   .option:hover:not(:disabled) {
-    background: rgba(30, 45, 74, 0.06);
+    background: var(--color-surface-raised);
     color: var(--color-text-secondary);
   }
 

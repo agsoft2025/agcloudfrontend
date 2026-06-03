@@ -1,12 +1,13 @@
 <script lang="ts">
   export let password: string;
 
+  // Semantic strength colours via CSS custom properties (theme-aware)
   const LEVELS = [
-    { label: '',       color: '' },
-    { label: 'Weak',   color: '#dc2626' },
-    { label: 'Fair',   color: '#d97706' },
-    { label: 'Good',   color: '#2563eb' },
-    { label: 'Strong', color: '#16a34a' },
+    { label: '',       tokenColor: 'transparent'                },
+    { label: 'Weak',   tokenColor: 'var(--color-error)'         },
+    { label: 'Fair',   tokenColor: '#d97706'                    },
+    { label: 'Good',   tokenColor: 'var(--color-secondary)'     },
+    { label: 'Strong', tokenColor: 'var(--color-success)'       },
   ] as const;
 
   function getScore(pw: string): number {
@@ -36,12 +37,12 @@
         <div
           class="bar"
           class:filled={score >= bar}
-          style="background-color: {score >= bar ? info.color : ''}"
+          style="--bar-color: {score >= bar ? info.tokenColor : 'var(--color-border)'}"
         ></div>
       {/each}
     </div>
     {#if info.label}
-      <span class="strength-label" style="color: {info.color}">{info.label}</span>
+      <span class="strength-label" style="color: {info.tokenColor}">{info.label}</span>
     {/if}
   </div>
 {/if}
@@ -69,7 +70,7 @@
     flex: 1;
     block-size: 3px;
     border-radius: 999px;
-    background: var(--color-border);
+    background: var(--bar-color, var(--color-border));
     transition: background-color 0.25s var(--ease-in-out);
   }
 

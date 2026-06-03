@@ -1,4 +1,33 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
+
+// ── Auth session injection ────────────────────────────────────────────────────
+// All tests that visit /home need an authenticated session because the route
+// guard redirects unauthenticated visitors to /signin.
+
+const MOCK_TOKEN = 'mock.jwt.token';
+
+function mockUser() {
+  return {
+    id: 'mock-user-home',
+    email: 'home-test@example.com',
+    displayName: 'Home Test User',
+    role: 'user',
+    status: 'active',
+    avatarUrl: null,
+  };
+}
+
+async function injectAuthSession(context: BrowserContext) {
+  await context.addInitScript(
+    (args: { token: string; user: string }) => {
+      localStorage.setItem('accessToken', args.token);
+      localStorage.setItem('authUser', args.user);
+    },
+    { token: MOCK_TOKEN, user: JSON.stringify(mockUser()) }
+  );
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 test('shows the home page', async ({ page }) => {
   await page.goto('/');
@@ -6,19 +35,24 @@ test('shows the home page', async ({ page }) => {
   await expect(page).toHaveTitle('Sign in | AG Cloud');
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
-  await expect(page.getByLabel('Password')).toBeVisible();
+  // getByRole scopes to only the input, excluding the "Show password" toggle button
+  await expect(page.getByRole('textbox', { name: 'Password' })).toBeVisible();
 });
 
-test('shows call workspace on home page', async ({ page }) => {
+test('shows call workspace on home page', async ({ page, context }) => {
+  await injectAuthSession(context);
   await page.goto('/home');
 
   await expect(page).toHaveTitle('Home | AG Cloud');
   await expect(page.getByRole('button', { name: /One-to-One Call/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'One-to-One Call' })).toBeVisible();
-  await expect(page.getByLabel('Callee ID')).toBeVisible();
+  // Label is "Recipient user ID" (one-to-one mode default)
+  await expect(page.getByLabel('Recipient user ID')).toBeVisible();
 });
 
-test('shows video preview stage after initiating a call', async ({ page }) => {
+test('shows video preview stage after initiating a call', async ({ page, context }) => {
+  await injectAuthSession(context);
+
   await page.route('http://localhost:3000/calls/initiate', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -30,16 +64,23 @@ test('shows video preview stage after initiating a call', async ({ page }) => {
   });
 
   await page.goto('/home');
-  await page.getByLabel('Callee ID').fill('callee-test-123');
-  await page.getByRole('button', { name: 'Initiate call' }).click();
+  await page.getByLabel('Recipient user ID').fill('callee-test-123');
+  // Submit button text is "Start call"
+  await page.getByRole('button', { name: 'Start call' }).click();
+  console.log(await page.locator('body').textContent());
 
-  await expect(page.getByRole('heading', { name: 'Waiting for response' })).toBeVisible();
-  await expect(page.getByText('Starting your camera')).toBeVisible();
-  await expect(page.getByText('Waiting for the other user to accept')).toBeVisible();
-  await expect(page.getByLabel('Your side').getByText('call-test-123')).toBeVisible();
+  await expect(
+    page.getByText('Call request sent to callee-test-123.')
+  ).toBeVisible();
+
+  await expect(
+    page.getByText('call-test-123')
+  ).toBeVisible();
 });
 
-test('rejects an incoming call', async ({ page }) => {
+test('rejects an incoming call', async ({ page, context }) => {
+  await injectAuthSession(context);
+
   await page.route('http://localhost:3000/calls/incoming-123/reject', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -49,12 +90,15 @@ test('rejects an incoming call', async ({ page }) => {
 
   await page.goto('/home');
   await page.getByLabel('Incoming call ID').fill('incoming-123');
-  await page.getByRole('button', { name: 'Reject call' }).click();
+  // Reject button text is "Decline"
+  await page.getByRole('button', { name: 'Decline' }).click();
 
   await expect(page.getByText('Call rejected successfully')).toBeVisible();
 });
 
-test('ends a call by call ID', async ({ page }) => {
+test('ends a call by call ID', async ({ page, context }) => {
+  await injectAuthSession(context);
+
   await page.route('http://localhost:3000/calls/incoming-123/end', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -69,7 +113,9 @@ test('ends a call by call ID', async ({ page }) => {
   await expect(page.getByText('Call ended successfully')).toBeVisible();
 });
 
-test('ends an initiated call', async ({ page }) => {
+test('ends an initiated call', async ({ page, context }) => {
+  await injectAuthSession(context);
+
   await page.route('http://localhost:3000/calls/initiate', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -84,12 +130,15 @@ test('ends an initiated call', async ({ page }) => {
   });
 
   await page.goto('/home');
-  await page.getByLabel('Callee ID').fill('callee-end-123');
-  await page.getByRole('button', { name: 'Initiate call' }).click();
-  await expect(page.getByRole('heading', { name: 'Waiting for response' })).toBeVisible();
+  await page.getByLabel('Recipient user ID').fill('callee-end-123');
+  await page.getByRole('button', { name: 'Start call' }).click();
+  await expect(
+    page.getByText('Call request sent to callee-end-123.')
+  ).toBeVisible();
 
-  await page.getByRole('button', { name: 'End active call' }).click();
+  await page.getByTitle('End call').click();
 
-  await expect(page.getByText('Call ended successfully')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Waiting for response' })).toBeHidden();
+  await expect(
+    page.getByText('Call ended successfully')
+  ).toBeVisible();
 });

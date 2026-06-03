@@ -95,7 +95,7 @@
     block-size: var(--badge-size);
     border: 2px solid var(--color-surface);
     border-radius: 999px;
-    background: #12b76a;
-    box-shadow: 0 0 0 1px color-mix(in srgb, #12b76a 30%, transparent);
+    background: var(--color-online);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-online) 30%, transparent);
   }
 </style>
