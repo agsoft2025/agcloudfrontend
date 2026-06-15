@@ -1,5 +1,5 @@
 <script lang="ts" context="module">
-  export type HomeSection = 'one-to-one';
+  export type HomeSection = 'one-to-one' | 'contact';
 
   export interface HomeSidebarItem {
     id: HomeSection;

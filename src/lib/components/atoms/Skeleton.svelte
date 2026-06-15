@@ -1,12 +1,17 @@
 <script lang="ts" context="module">
-  export type SkeletonVariant = 'contacts' | 'call-history';
+  export type SkeletonVariant = 'contacts' | 'call-history' | 'contact-details';
 </script>
 
 <script lang="ts">
   export let variant: SkeletonVariant = 'contacts';
   export let rows = variant === 'contacts' ? 5 : 4;
 
-  $: accessibleLabel = variant === 'contacts' ? 'Loading contacts' : 'Loading call history';
+  $: accessibleLabel =
+    variant === 'contacts'
+      ? 'Loading contacts'
+      : variant === 'contact-details'
+        ? 'Loading contact details'
+        : 'Loading call history';
 </script>
 
 <div class="skeleton" data-variant={variant} aria-label={accessibleLabel} role="status">
@@ -21,6 +26,29 @@
         <span class="status-dot shimmer"></span>
       </div>
     {/each}
+  {:else if variant === 'contact-details'}
+    <div class="detail-card" aria-hidden="true">
+      <div class="detail-hero">
+        <span class="detail-avatar shimmer"></span>
+        <div class="detail-hero-copy">
+          <span class="line detail-name shimmer"></span>
+          <span class="line detail-role shimmer"></span>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <span class="action-btn shimmer"></span>
+        <span class="action-btn shimmer"></span>
+        <span class="action-btn shimmer"></span>
+      </div>
+      <div class="detail-fields">
+        {#each Array.from({ length: 4 }) as __, i}
+          <div class="detail-field">
+            <span class="line field-label shimmer"></span>
+            <span class="line field-value shimmer" data-short={i % 3 === 2}></span>
+          </div>
+        {/each}
+      </div>
+    </div>
   {:else}
     {#each Array.from({ length: rows }) as _, index}
       <article class="history-card" aria-hidden="true">
@@ -158,6 +186,80 @@
 
   .history-duration {
     inline-size: min(100%, 6rem);
+  }
+
+  /* contact-details variant */
+  .detail-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    padding: var(--space-lg);
+    display: grid;
+    gap: var(--space-lg);
+  }
+
+  .detail-hero {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .detail-avatar {
+    display: block;
+    inline-size: 4rem;
+    block-size: 4rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .detail-hero-copy {
+    display: grid;
+    gap: var(--space-sm);
+    flex: 1;
+  }
+
+  .detail-name {
+    inline-size: min(70%, 14rem);
+    block-size: 1rem;
+  }
+
+  .detail-role {
+    inline-size: min(45%, 9rem);
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: var(--space-sm);
+  }
+
+  .action-btn {
+    display: block;
+    inline-size: 5.5rem;
+    block-size: 2.25rem;
+    border-radius: var(--radius-md);
+  }
+
+  .detail-fields {
+    display: grid;
+    gap: var(--space-md);
+  }
+
+  .detail-field {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .field-label {
+    inline-size: min(30%, 6rem);
+    block-size: 0.625rem;
+  }
+
+  .field-value {
+    inline-size: min(65%, 14rem);
+  }
+
+  .field-value[data-short='true'] {
+    inline-size: min(40%, 9rem);
   }
 
   .shimmer {
