@@ -17,8 +17,9 @@
   import ContactList from '$lib/components/home/ContactList.svelte';
   import ContactDetail from '$lib/components/home/ContactDetail.svelte';
   import RecentCalls from '$lib/components/home/RecentCalls.svelte';
-  import { initiateCall } from '$lib/api/calls.api';
+  import { initiateCall, getCallIdentifier, hasLiveKitCredentials, getCallApiErrorMessage } from '$lib/api/calls.api';
   import { userStore, type UserProfile } from '$lib/stores/user.store';
+  import { activeCallStore } from '$lib/stores/active-call.store';
 
   // Sidebar nav
   const sidebarItems: HomeSidebarItem[] = [
@@ -42,13 +43,32 @@
   // Call initiation
   async function handleCall(contact: UserProfile, callType: 'audio' | 'video') {
     try {
-      await initiateCall({
+      const response = await initiateCall({
         receiverIds: [contact.id],
         callType,
         callMode: 'one-to-one'
       });
+
+      const callId = getCallIdentifier(response);
+      if (!callId) {
+        throw new Error('Call initiated but no call id was returned.');
+      }
+
+      activeCallStore.startOutgoing({
+        callId,
+        peer: {
+          id: contact.id,
+          name: contact.displayName ?? contact.email,
+          avatarUrl: contact.avatarUrl ?? null
+        },
+        callType,
+        callMode: 'one-to-one',
+        liveKit: hasLiveKitCredentials(response)
+          ? { token: response.token, roomName: response.roomName, url: response.url }
+          : null
+      });
     } catch (err) {
-      console.error('[ContactDashboard] Call initiation failed:', err);
+      console.error('[ContactDashboard] Call initiation failed:', getCallApiErrorMessage(err));
     }
   }
 </script>

@@ -31,17 +31,21 @@
 
   // ── Helpers ────────────────────────────────────────────────────
   $: currentUserId = $authStore.user?.id ?? '';
+  $: profiles = $userStore.profiles;
+
+  /** The peer (other party) user id for a call entry, relative to the current user. */
+  function getPeerId(entry: CallHistoryEntry): string | undefined {
+    return entry.callerId === currentUserId
+      ? (entry.calleeId ?? entry.receiverIds?.[0])
+      : entry.callerId;
+  }
 
   /** Derive display name for a call entry relative to the current user. */
   function getPeerName(entry: CallHistoryEntry): string {
-    const peerId =
-      entry.callerId === currentUserId
-        ? (entry.calleeId ?? entry.receiverIds?.[0])
-        : entry.callerId;
-
+    const peerId = getPeerId(entry);
     if (!peerId) return 'Unknown';
 
-    const profile = userStore.getProfile(peerId);
+    const profile = profiles.get(peerId);
     if (profile?.displayName?.trim()) return profile.displayName.trim();
     if (profile?.email) {
       const local = profile.email.split('@')[0];
@@ -51,12 +55,24 @@
   }
 
   function getPeerAvatar(entry: CallHistoryEntry): string | undefined {
-    const peerId =
-      entry.callerId === currentUserId
-        ? (entry.calleeId ?? entry.receiverIds?.[0])
-        : entry.callerId;
+    const peerId = getPeerId(entry);
     if (!peerId) return undefined;
-    return userStore.getProfile(peerId)?.avatarUrl ?? undefined;
+    return profiles.get(peerId)?.avatarUrl ?? undefined;
+  }
+
+  /** Ensure every peer referenced in the call list has a cached profile. */
+  function hydratePeerProfiles(entries: CallHistoryEntry[]) {
+    const peerIds = new Set<string>();
+    for (const entry of entries) {
+      const peerId = getPeerId(entry);
+      if (peerId) peerIds.add(peerId);
+    }
+
+    for (const peerId of peerIds) {
+      if (!userStore.getProfile(peerId) && !userStore.isLoading(peerId)) {
+        void userStore.hydrateProfile(peerId).catch(() => {});
+      }
+    }
   }
 
   /** Derive call direction if not provided by the server. */
@@ -96,6 +112,7 @@
     error = null;
     try {
       calls = await getCallHistory(20);
+      hydratePeerProfiles(calls);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not load call history.';
     } finally {
