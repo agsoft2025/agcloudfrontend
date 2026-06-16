@@ -18,27 +18,44 @@
   import ContactDetail from '$lib/components/home/ContactDetail.svelte';
   import RecentCalls from '$lib/components/home/RecentCalls.svelte';
   import { initiateCall, getCallIdentifier, hasLiveKitCredentials, getCallApiErrorMessage } from '$lib/api/calls.api';
-  import { userStore, type UserProfile } from '$lib/stores/user.store';
+  import type { UserProfile } from '$lib/stores/user.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
 
   // Sidebar nav
   const sidebarItems: HomeSidebarItem[] = [
     {
       id: 'contact',
-      label: 'Contact',
+      label: 'Contacts',
       description: 'View and call your contacts'
+    },
+    {
+      id: 'calls',
+      label: 'Calls',
+      description: 'Recent and missed calls'
     }
   ];
 
   let selectedSection: HomeSection = 'contact';
   let mobileNavOpen = false;
 
-  // Contact selection
-  let selectedContactId: string | null = null;
+  // Contacts drawer (slides in from the left over the detail/history view)
+  let contactsDrawerOpen = false;
 
-  $: selectedContact = selectedContactId
-    ? (userStore.getProfile(selectedContactId) ?? null)
-    : null;
+  function toggleContactsDrawer() {
+    contactsDrawerOpen = !contactsDrawerOpen;
+  }
+
+  function closeContactsDrawer() {
+    contactsDrawerOpen = false;
+  }
+
+  // Contact selection — both props are bound directly from ContactList
+  // so ContactDetail receives the full UserProfile without any store lookup.
+  let selectedContactId: string | null = null;
+  let selectedContact: UserProfile | null = null;
+
+  // Close the contacts drawer once a contact is selected so the detail view is visible
+  $: if (selectedContactId) contactsDrawerOpen = false;
 
   // Call initiation
   async function handleCall(contact: UserProfile, callType: 'audio' | 'video') {
@@ -112,17 +129,47 @@
       <div style="inline-size: 2.25rem;" aria-hidden="true"></div>
     </header>
 
-    <!-- Three-column dashboard area -->
+    <!-- Dashboard area: contacts drawer + detail/history -->
     <div class="dashboard" aria-label="Contact dashboard">
 
-      <!-- Column 1: Contact list (hidden on mobile when a contact is selected) -->
+      <!-- Contacts toggle button -->
+      <button
+        class="contacts-toggle"
+        type="button"
+        aria-label={contactsDrawerOpen ? 'Close contacts' : 'Open contacts'}
+        aria-expanded={contactsDrawerOpen}
+        aria-controls="contacts-drawer"
+        on:click={toggleContactsDrawer}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="1.75"/>
+          <path d="M2 20a6.5 6.5 0 0114 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <path d="M16 9h6M19 6v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        <span>Contacts</span>
+      </button>
+
+      <!-- Drawer backdrop -->
+      {#if contactsDrawerOpen}
+        <div
+          class="drawer-backdrop"
+          aria-hidden="true"
+          on:click={closeContactsDrawer}
+          on:keydown={(e) => e.key === 'Escape' && closeContactsDrawer()}
+        ></div>
+      {/if}
+
+      <!-- Contacts drawer (slides in from the left) -->
       <section
-        class="col-contacts"
-        class:is-hidden={selectedContactId !== null}
+        id="contacts-drawer"
+        class="contacts-drawer"
+        class:is-open={contactsDrawerOpen}
         aria-label="Contacts"
+        aria-hidden={!contactsDrawerOpen}
       >
         <ContactList
           bind:selectedId={selectedContactId}
+          bind:selectedContact={selectedContact}
           onCallContact={handleCall}
         />
       </section>
@@ -143,16 +190,24 @@
         </button>
       {/if}
 
-      <!-- Column 2: Contact detail -->
-      <section class="col-detail" aria-label="Contact details">
+      <!-- Contact detail -->
+      <section
+        class="col-detail"
+        class:col-hidden-mobile={selectedSection === 'calls'}
+        aria-label="Contact details"
+      >
         <ContactDetail
           contact={selectedContact}
           onCall={handleCall}
         />
       </section>
 
-      <!-- Column 3: Recent call history (hidden below tablet breakpoint) -->
-      <section class="col-history" aria-label="Recent calls">
+      <!-- Recent call history -->
+      <section
+        class="col-history"
+        class:col-visible-mobile={selectedSection === 'calls'}
+        aria-label="Recent calls"
+      >
         <RecentCalls />
       </section>
 
@@ -231,7 +286,7 @@
     object-fit: contain;
   }
 
-  /* Dashboard: 3-column flex row */
+  /* Dashboard: detail + history, with contacts as an overlay drawer */
   .dashboard {
     flex: 1;
     min-block-size: 0;
@@ -240,16 +295,75 @@
     position: relative;
   }
 
-  /* Column 1: Contact list */
-  .col-contacts {
+  /* Contacts toggle button */
+  .contacts-toggle {
+    position: absolute;
+    inset-block-start: 0.75rem;
+    inset-inline-start: 0.75rem;
+    z-index: 35;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+
+  .contacts-toggle:hover {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+  }
+
+  .contacts-toggle:focus-visible {
+    outline: 2px solid var(--color-secondary);
+    outline-offset: 2px;
+  }
+
+  /* Drawer backdrop */
+  .drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    animation: fade-in 160ms ease both;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Contacts drawer: slides in from the left, overlays detail/history */
+  .contacts-drawer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 30;
     inline-size: 22rem;
-    flex-shrink: 0;
+    max-inline-size: 90vw;
+    transform: translateX(-100%);
+    transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  /* Column 2: Contact detail */
+  .contacts-drawer.is-open {
+    transform: translateX(0);
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Contact detail */
   .col-detail {
     flex: 1;
     min-inline-size: 0;
@@ -258,7 +372,7 @@
     overflow: hidden;
   }
 
-  /* Column 3: Recent calls */
+  /* Recent calls */
   .col-history {
     display: flex;
     flex-direction: column;
@@ -270,9 +384,22 @@
     display: none;
   }
 
-  /* Tablet: slightly narrower contact list */
+  /* Recent calls panel: desktop shows fixed width; mobile hides by default */
+  @media (max-width: 800px) {
+    .col-hidden-mobile {
+      display: none;
+    }
+
+    .col-history.col-visible-mobile {
+      display: flex;
+      flex: 1;
+      min-block-size: 100%;
+    }
+  }
+
+  /* Tablet: slightly narrower drawer */
   @media (max-width: 1100px) {
-    .col-contacts {
+    .contacts-drawer {
       inline-size: 18rem;
     }
   }
@@ -284,20 +411,11 @@
     }
 
     .dashboard {
-      flex-direction: column;
       overflow-y: auto;
     }
 
-    .col-contacts {
+    .contacts-drawer {
       inline-size: 100%;
-      flex-shrink: 0;
-      block-size: auto;
-      min-block-size: 100%;
-    }
-
-    /* Hide contact list when a contact is selected (mobile only) */
-    .col-contacts.is-hidden {
-      display: none;
     }
 
     .col-detail {

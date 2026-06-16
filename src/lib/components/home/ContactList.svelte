@@ -25,6 +25,8 @@
 
   // ── Props ──────────────────────────────────────────────────────
   export let selectedId: string | null = null;
+  /** Bindable: set to the full UserProfile whenever a row is selected. */
+  export let selectedContact: UserProfile | null = null;
   export let onCallContact: ((contact: UserProfile, type: 'audio' | 'video') => void) | undefined =
     undefined;
 
@@ -78,6 +80,9 @@
   function getStatusLabel(status: PresenceStatus): string {
     return status.charAt(0).toUpperCase() + status.slice(1);
   }
+
+  // Keep selectedContact in sync when selectedId is cleared externally
+  $: if (!selectedId) selectedContact = null;
 
   // ── Fetch ──────────────────────────────────────────────────────
   async function load() {
@@ -188,8 +193,8 @@
           role="option"
           aria-selected={isSelected}
           tabindex="0"
-          onclick={() => (selectedId = contact.id)}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectedId = contact.id; }}
+          onclick={() => { selectedId = contact.id; selectedContact = contact; }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { selectedId = contact.id; selectedContact = contact; } }}
         >
           <!-- Avatar with presence dot -->
           <div class="cl-avatar-wrap">

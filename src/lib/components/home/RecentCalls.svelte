@@ -14,12 +14,14 @@
     onCallBack — optional callback when user presses "Call Back"
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import Avatar from '$lib/components/atoms/Avatar.svelte';
   import Skeleton from '$lib/components/atoms/Skeleton.svelte';
   import { getCallHistory, type CallHistoryEntry, type CallDirection } from '$lib/api/contacts.api';
   import { authStore } from '$lib/stores/auth.store';
   import { userStore } from '$lib/stores/user.store';
+  import { callLifecycleEvents } from '$lib/realtime/call-signaling';
+  import { activeCallStore } from '$lib/stores/active-call.store';
 
   // ── Props ──────────────────────────────────────────────────────
   export let onCallBack: ((entry: CallHistoryEntry) => void) | undefined = undefined;
@@ -28,6 +30,7 @@
   let calls: CallHistoryEntry[] = [];
   let isLoading = true;
   let error: string | null = null;
+  let now = Date.now();
 
   // ── Helpers ────────────────────────────────────────────────────
   $: currentUserId = $authStore.user?.id ?? '';
@@ -106,6 +109,21 @@
     return `${m}m ${s}s`;
   }
 
+  /** Live elapsed duration (seconds) for an ongoing call, ticking off `now`. */
+  function liveDurationSeconds(entry: CallHistoryEntry): number | undefined {
+    if (!entry.isActive || !entry.startedAt) return entry.durationSeconds;
+    return Math.max(0, Math.floor((now - new Date(entry.startedAt).getTime()) / 1000));
+  }
+
+  /** Human-readable status label for the call history item. */
+  function getStatusLabel(entry: CallHistoryEntry, direction: CallDirection): string {
+    if (entry.isActive) return 'Call in Progress';
+    if (entry.status === 'initiated') return 'Ringing';
+    if (entry.status === 'missed' || entry.participantStatus === 'missed') return 'Missed Call';
+    if (entry.status === 'rejected' || entry.participantStatus === 'rejected') return 'Rejected';
+    return direction === 'outgoing' ? 'Outgoing' : 'Incoming';
+  }
+
   // ── Fetch ──────────────────────────────────────────────────────
   async function load() {
     isLoading = true;
@@ -120,8 +138,38 @@
     }
   }
 
+  // ── Join an ongoing call from history ─────────────────────────
+  function handleJoinCall(entry: CallHistoryEntry) {
+    activeCallStore.addIncomingInvite({
+      callId: entry.id,
+      peer: { id: getPeerId(entry) ?? '', name: getPeerName(entry), avatarUrl: getPeerAvatar(entry) ?? null },
+      callType: entry.callType ?? 'video',
+      callMode: entry.callMode ?? 'one-to-one',
+      reinvite: true
+    });
+  }
+
+  // ── Live updates: re-fetch history whenever a call lifecycle event fires ──
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const unsubscribeLifecycle = callLifecycleEvents.subscribe((event) => {
+    if (!event) return;
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => void load(), 300);
+  });
+
+  let tickInterval: ReturnType<typeof setInterval> | undefined;
+
   onMount(() => {
     void load();
+    tickInterval = setInterval(() => {
+      now = Date.now();
+    }, 1000);
+  });
+
+  onDestroy(() => {
+    unsubscribeLifecycle();
+    clearTimeout(refreshTimer);
+    if (tickInterval) clearInterval(tickInterval);
   });
 </script>
 
@@ -164,9 +212,11 @@
           {@const peerAvatar = getPeerAvatar(entry)}
           {@const ts = formatTimestamp(entry.createdAt)}
           {@const dur = formatDuration(entry.durationSeconds)}
-          {@const isMissed = direction === 'missed'}
+          {@const liveDur = formatDuration(liveDurationSeconds(entry))}
+          {@const isMissed = direction === 'missed' || entry.status === 'missed' || entry.participantStatus === 'missed'}
+          {@const statusLabel = getStatusLabel(entry, direction)}
 
-          <li class="rc-item" class:rc-item--missed={isMissed}>
+          <li class="rc-item" class:rc-item--missed={isMissed} class:rc-item--active={entry.isActive}>
             <div class="rc-item-inner">
               <!-- Avatar -->
               <div class="rc-avatar">
@@ -182,12 +232,31 @@
                   {/if}
                 </div>
                 <div class="rc-direction" data-direction={direction}>
-                  {#if direction === 'missed'}
+                  {#if entry.isActive}
+                    <span class="rc-live-dot" aria-hidden="true"></span>
+                    {statusLabel}
+                    {#if liveDur}<span class="rc-dur">· {liveDur}</span>{/if}
+                    {#if entry.participantCount && entry.participantCount > 1}
+                      <span class="rc-dur">· {entry.participantCount} participants</span>
+                    {/if}
+                  {:else if isMissed}
                     <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Missed" role="img">
                       <path d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Missed Call
+                    {statusLabel}
+                  {:else if entry.status === 'rejected' || entry.participantStatus === 'rejected'}
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Rejected" role="img">
+                      <path d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    {statusLabel}
+                  {:else if entry.status === 'initiated'}
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Ringing" role="img">
+                      <path d="M12 8v4l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    {statusLabel}
                   {:else if direction === 'outgoing'}
                     <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Outgoing" role="img">
                       <path d="M7 17L17 7M17 7H7M17 7v10"
@@ -209,17 +278,31 @@
 
             <!-- Hover actions -->
             <div class="rc-actions">
-              <button
-                class="rc-call-back-btn"
-                type="button"
-                aria-label="Call back {peerName}"
-                onclick={() => onCallBack?.(entry)}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
-                </svg>
-                Call Back
-              </button>
+              {#if entry.isActive}
+                <button
+                  class="rc-join-btn"
+                  type="button"
+                  aria-label="Join call with {peerName}"
+                  onclick={() => handleJoinCall(entry)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+                  </svg>
+                  Join Call
+                </button>
+              {:else}
+                <button
+                  class="rc-call-back-btn"
+                  type="button"
+                  aria-label="Call back {peerName}"
+                  onclick={() => onCallBack?.(entry)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+                  </svg>
+                  Call Back
+                </button>
+              {/if}
               <button
                 class="rc-more-btn"
                 type="button"
@@ -326,6 +409,29 @@
 
   .rc-item--missed {
     border-inline-start: 3px solid var(--color-error);
+  }
+
+  .rc-item--active {
+    border-inline-start: 3px solid #16a34a;
+  }
+
+  .rc-item--active .rc-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .rc-live-dot {
+    display: inline-block;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-radius: 999px;
+    background: #16a34a;
+    animation: rc-live-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes rc-live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
   }
 
   .rc-item-inner {
@@ -436,6 +542,33 @@
 
   .rc-call-back-btn:focus-visible {
     outline: 2px solid var(--color-secondary);
+    outline-offset: 2px;
+  }
+
+  .rc-join-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.375rem var(--space-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in srgb, #16a34a 30%, transparent);
+    background: color-mix(in srgb, #16a34a 12%, transparent);
+    color: #16a34a;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+  }
+
+  .rc-join-btn:hover {
+    background: color-mix(in srgb, #16a34a 20%, transparent);
+  }
+
+  .rc-join-btn:focus-visible {
+    outline: 2px solid #16a34a;
     outline-offset: 2px;
   }
 

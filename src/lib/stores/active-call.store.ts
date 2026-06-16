@@ -28,6 +28,20 @@ export interface LiveKitCredentials {
   url?: string;
 }
 
+/** A pending call invitation shown in the persistent notification banner. */
+export interface IncomingInvite {
+  callId: string;
+  peer: ActiveCallPeer;
+  callType: CallType;
+  callMode: 'one-to-one' | 'conference';
+  roomId?: string;
+  /** True if this is a re-invite (the user previously missed/rejected/left this call). */
+  reinvite: boolean;
+  /** 'ringing' while waiting for a response, 'ended' once the call has finished. */
+  status: 'ringing' | 'ended';
+  receivedAt: number;
+}
+
 export interface ActiveCallState {
   phase: ActiveCallPhase;
   callId: string | null;
@@ -36,6 +50,8 @@ export interface ActiveCallState {
   callMode: 'one-to-one' | 'conference';
   liveKit: LiveKitCredentials | null;
   error: string | null;
+  /** All pending/active call invitations for the persistent notification banner. */
+  incomingInvites: IncomingInvite[];
 }
 
 const initialState: ActiveCallState = {
@@ -45,14 +61,48 @@ const initialState: ActiveCallState = {
   callType: 'video',
   callMode: 'one-to-one',
   liveKit: null,
-  error: null
+  error: null,
+  incomingInvites: []
 };
 
 function createActiveCallStore() {
-  const { subscribe, set, update } = writable<ActiveCallState>(initialState);
+  const { subscribe, update } = writable<ActiveCallState>(initialState);
 
   return {
     subscribe,
+
+    /** Add a fresh incoming-call notification, or refresh it if one already exists for this call. */
+    addIncomingInvite(invite: Omit<IncomingInvite, 'receivedAt' | 'status'>) {
+      update((state) => {
+        const existingIndex = state.incomingInvites.findIndex((i) => i.callId === invite.callId);
+        const entry: IncomingInvite = { ...invite, receivedAt: Date.now(), status: 'ringing' };
+
+        if (existingIndex === -1) {
+          return { ...state, incomingInvites: [...state.incomingInvites, entry] };
+        }
+
+        const incomingInvites = [...state.incomingInvites];
+        incomingInvites[existingIndex] = { ...incomingInvites[existingIndex], ...entry };
+        return { ...state, incomingInvites };
+      });
+    },
+
+    /** Mark a pending invitation as ended (call finished before the user responded). */
+    markInviteEnded(callId: string) {
+      update((state) => ({
+        ...state,
+        incomingInvites: state.incomingInvites.map((invite) =>
+          invite.callId === callId ? { ...invite, status: 'ended' } : invite
+        )
+      }));
+    },
+
+    removeIncomingInvite(callId: string) {
+      update((state) => ({
+        ...state,
+        incomingInvites: state.incomingInvites.filter((invite) => invite.callId !== callId)
+      }));
+    },
 
     /** Caller side: a call was just initiated, show "Calling…" UI. */
     startOutgoing(params: {
@@ -62,7 +112,9 @@ function createActiveCallStore() {
       callMode: 'one-to-one' | 'conference';
       liveKit: LiveKitCredentials | null;
     }) {
-      set({
+      update((state) => ({
+        ...initialState,
+        incomingInvites: state.incomingInvites,
         phase: 'outgoing-ringing',
         callId: params.callId,
         peer: params.peer,
@@ -70,7 +122,7 @@ function createActiveCallStore() {
         callMode: params.callMode,
         liveKit: params.liveKit,
         error: null
-      });
+      }));
     },
 
     /** Callee side: an incoming call notification arrived via socket. */
@@ -80,7 +132,9 @@ function createActiveCallStore() {
       callType: CallType;
       callMode: 'one-to-one' | 'conference';
     }) {
-      set({
+      update((state) => ({
+        ...initialState,
+        incomingInvites: state.incomingInvites,
         phase: 'incoming-ringing',
         callId: params.callId,
         peer: params.peer,
@@ -88,7 +142,7 @@ function createActiveCallStore() {
         callMode: params.callMode,
         liveKit: null,
         error: null
-      });
+      }));
     },
 
     setConnecting() {
@@ -113,7 +167,7 @@ function createActiveCallStore() {
     },
 
     reset() {
-      set(initialState);
+      update((state) => ({ ...initialState, incomingInvites: state.incomingInvites }));
     }
   };
 }

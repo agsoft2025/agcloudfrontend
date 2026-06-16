@@ -104,6 +104,22 @@ export async function getCall(callId: string) {
   return response.data;
 }
 
+export interface AddParticipantResponse {
+  message?: string;
+  call?: CallSummary;
+  [key: string]: unknown;
+}
+
+export async function addParticipant(callId: string, userId: string) {
+  const response = await axiosClient.post<AddParticipantResponse>(
+    `/calls/${encodeURIComponent(callId)}/add-participant`,
+    { userId },
+    getAuthRequestConfig()
+  );
+
+  return response.data;
+}
+
 export async function endCall(callId: string) {
   const response = await axiosClient.post<EndCallResponse>(
     `/calls/${encodeURIComponent(callId)}/end`,

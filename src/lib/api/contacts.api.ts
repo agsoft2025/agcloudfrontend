@@ -44,12 +44,21 @@ export interface CallHistoryEntry {
   calleeId?: string;
   receiverIds?: string[];
   callType?: 'audio' | 'video';
-  /** Backend status string, e.g. 'completed', 'missed', 'rejected'. */
+  callMode?: 'one-to-one' | 'conference';
+  /** Backend status string: 'initiated' | 'active' | 'rejected' | 'ended' | 'missed'. */
   status?: string;
+  /** The current user's own per-call invitation status (undefined for the caller). */
+  participantStatus?: 'invited' | 'joined' | 'rejected' | 'left' | 'missed';
+  /** True if the call is currently ongoing (status === 'active'). */
+  isActive?: boolean;
+  /** Number of participants currently joined (+ the caller while active). */
+  participantCount?: number;
   /** Derived client-side direction (optional, enriched by RecentCalls). */
   direction?: CallDirection;
   durationSeconds?: number;
   createdAt?: string;
+  startedAt?: string;
+  endedAt?: string;
   // Enriched display fields merged from userStore
   callerName?: string;
   calleeName?: string;

@@ -533,7 +533,7 @@
      ═══════════════════════════════════════════════════════════ */
   .ical-actions {
     display: flex;
-    align-items: center;
+    align-items: stretch;   /* equal height regardless of content */
     gap: var(--space-md, 1rem);
     inline-size: 100%;
   }
@@ -543,12 +543,20 @@
   .ical-reject {
     flex: 1;
     display: flex;
+    min-inline-size: 0;
   }
 
   .ical-accept :global(.button),
   .ical-reject :global(.button) {
     inline-size: 100%;
     min-inline-size: unset;
+    block-size: 100%;
+  }
+
+  /* Keep focus ring inside each button so it never bleeds into its sibling */
+  .ical-accept :global(button:focus-visible),
+  .ical-reject :global(button:focus-visible) {
+    outline-offset: -3px;
   }
 
   /* Button inner layout: icon left of label */

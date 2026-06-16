@@ -12,10 +12,16 @@
 </script>
 
 <script lang="ts">
-  import { ConnectionState, Track } from 'livekit-client';
+  import { ConnectionQuality, ConnectionState, Track, VideoQuality } from 'livekit-client';
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { fade, scale } from 'svelte/transition';
   import { callStore } from '$lib/stores/call.store';
   import { liveKitClient } from '$lib/livekit/LiveKitClient';
+  import { getContacts } from '$lib/api/contacts.api';
+  import { addParticipant, getCallApiErrorMessage } from '$lib/api/calls.api';
+  import { authStore } from '$lib/stores/auth.store';
+  import { callLifecycleEvents } from '$lib/realtime/call-signaling';
+  import type { UserProfile } from '$lib/stores/user.store';
   import LiveKitTrack from './LiveKitTrack.svelte';
   import ParticipantTile from './ParticipantTile.svelte';
   import RoomIdChip from './RoomIdChip.svelte';
@@ -24,6 +30,138 @@
   export let isEndingCall = false;
 
   const dispatch = createEventDispatcher<{ endCall: void }>();
+
+  let meetingRoomEl: HTMLDivElement;
+
+  // ── Pin / layout state ─────────────────────────────
+  let pinnedId: string | null = null;
+
+  // ── Raise hand state ────────────────────────────────
+  let isHandRaisedLocal = false;
+
+  // ── Screen share state ──────────────────────────────
+  let isTogglingScreenShare = false;
+
+  // ── Full screen state ───────────────────────────────
+  let isFullscreen = false;
+
+  function mapNetworkQuality(q: ConnectionQuality | undefined): 'excellent' | 'good' | 'poor' | undefined {
+    switch (q) {
+      case ConnectionQuality.Excellent: return 'excellent';
+      case ConnectionQuality.Good: return 'good';
+      case ConnectionQuality.Poor: return 'poor';
+      default: return undefined;
+    }
+  }
+
+  function togglePin(id: string) {
+    pinnedId = pinnedId === id ? null : id;
+  }
+
+  async function toggleScreenShare() {
+    if (isTogglingScreenShare || !isConnected) return;
+    isTogglingScreenShare = true;
+    controlError = '';
+    try {
+      await liveKitClient.setScreenShareEnabled(!isScreenSharing);
+      if ($callStore.room) callStore.syncRoom($callStore.room);
+    } catch (e) {
+      controlError = e instanceof Error ? e.message : 'Unable to toggle screen share.';
+    } finally {
+      isTogglingScreenShare = false;
+    }
+  }
+
+  function toggleRaiseHand() {
+    isHandRaisedLocal = !isHandRaisedLocal;
+    const identity = $callStore.localParticipant?.identity;
+    if (identity) callStore.setHandRaised(identity, isHandRaisedLocal);
+
+    const room = $callStore.room;
+    if (room) {
+      const payload = new TextEncoder().encode(
+        JSON.stringify({ type: 'raise-hand', raised: isHandRaisedLocal })
+      );
+      room.localParticipant.publishData(payload, { reliable: true }).catch(() => undefined);
+    }
+  }
+
+  function handleFullscreenChange() {
+    isFullscreen = Boolean(document.fullscreenElement);
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await meetingRoomEl?.requestFullscreen();
+      }
+    } catch {
+      // Fullscreen not supported / denied — ignore.
+    }
+  }
+
+  // ── Add people state ───────────────────────────────
+  let showAddPeople = false;
+  let contacts: UserProfile[] = [];
+  let contactsLoading = false;
+  let contactsError = '';
+  let contactSearch = '';
+  let addingUserId: string | null = null;
+  let addPeopleError = '';
+  // Per-user invite status shown in the Add people panel.
+  // 'inviting'  — API call in flight
+  // 'invited'   — invite sent, awaiting response
+  // 'rejected'  — person declined (shown briefly, then resets to allow re-invite)
+  let inviteStatuses = new Map<string, 'inviting' | 'invited' | 'rejected'>();
+  let rejectionResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  // ── Video quality profile ─────────────────────────
+  type VideoQualityProfile = 'auto' | 'data-saver' | 'hd' | 'fhd';
+  let videoQualityProfile: VideoQualityProfile = 'hd';
+  let showQualityMenu = false;
+
+  const QUALITY_LABELS: Record<VideoQualityProfile, string> = {
+    'auto':       'Auto',
+    'data-saver': 'Data Saver',
+    'hd':         'HD 720p',
+    'fhd':        'Full HD 1080p'
+  };
+
+  function applyVideoQualityProfile(profile: VideoQualityProfile) {
+    videoQualityProfile = profile;
+    showQualityMenu = false;
+    const room = $callStore.room;
+    if (!room) return;
+    room.remoteParticipants.forEach((p) => {
+      p.trackPublications.forEach((pub) => {
+        if (pub.kind !== Track.Kind.Video) return;
+        switch (profile) {
+          case 'auto':
+            pub.setVideoQuality(VideoQuality.HIGH);
+            pub.setVideoDimensions({ width: 1280, height: 720 });
+            pub.setVideoFPS(30);
+            break;
+          case 'data-saver':
+            pub.setVideoQuality(VideoQuality.LOW);
+            pub.setVideoDimensions({ width: 320, height: 240 });
+            pub.setVideoFPS(15);
+            break;
+          case 'hd':
+            pub.setVideoQuality(VideoQuality.HIGH);
+            pub.setVideoDimensions({ width: 1280, height: 720 });
+            pub.setVideoFPS(30);
+            break;
+          case 'fhd':
+            pub.setVideoQuality(VideoQuality.HIGH);
+            pub.setVideoDimensions({ width: 1920, height: 1080 });
+            pub.setVideoFPS(30);
+            break;
+        }
+      });
+    });
+  }
 
   // ── Recording state ────────────────────────────────
   let mediaRecorder: MediaRecorder | null = null;
@@ -46,11 +184,15 @@
     elapsedTimer = setInterval(() => {
       elapsedSeconds = Math.floor((Date.now() - session.initiatedAt.getTime()) / 1000);
     }, 1000);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
   });
 
   onDestroy(() => {
     if (isRecordingCall) stopRecordingMedia();
     if (elapsedTimer) clearInterval(elapsedTimer);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    unsubscribeCallEvents();
+    rejectionResetTimers.forEach((t) => clearTimeout(t));
   });
 
   // ── Recording ──────────────────────────────────────
@@ -190,7 +332,7 @@
   $: remoteTiles = $callStore.remoteParticipants.map((p) => {
     const name = p.name ?? p.identity;
     const videoTrack = p.tracks.find(
-      (t) => t.kind === Track.Kind.Video && t.track && !t.isMuted
+      (t) => t.kind === Track.Kind.Video && t.track && !t.isMuted && t.source === Track.Source.Camera
     )?.track;
     const videoPublication = p.tracks.find(
       (t) => t.kind === Track.Kind.Video && t.source === Track.Source.Camera
@@ -198,24 +340,155 @@
     const audioPublication = p.tracks.find(
       (t) => t.kind === Track.Kind.Audio && t.source === Track.Source.Microphone
     );
+    const screenSharePublication = p.tracks.find(
+      (t) => t.kind === Track.Kind.Video && t.source === Track.Source.ScreenShare && t.track && !t.isMuted
+    );
     return {
       id: p.sid || p.identity,
       name,
       videoTrack,
+      screenShareTrack: screenSharePublication?.track,
       isMuted: Boolean(audioPublication?.isMuted),
       isCameraOff: !videoPublication || videoPublication.isMuted || !videoPublication.track,
-      isActive: $callStore.activeSpeakers.includes(p.identity)
+      isActive: $callStore.activeSpeakers.includes(p.identity),
+      isLocal: false,
+      networkQuality: mapNetworkQuality(p.connectionQuality),
+      isHandRaised: $callStore.raisedHands.includes(p.identity)
     };
   });
 
+  // Local participant tile
+  $: localScreenShareTrack = $callStore.localParticipant?.tracks.find(
+    (t) => t.kind === Track.Kind.Video && t.source === Track.Source.ScreenShare && t.track && !t.isMuted
+  )?.track;
+
+  $: localTile = $callStore.localParticipant ? {
+    id: 'local',
+    name: 'You',
+    videoTrack: localVideoTrack,
+    screenShareTrack: localScreenShareTrack,
+    isMuted: !isMicrophoneEnabled,
+    isCameraOff: !isCameraEnabled,
+    isActive: isLocalSpeaking,
+    isLocal: true,
+    networkQuality: mapNetworkQuality($callStore.localParticipant.connectionQuality),
+    isHandRaised: isHandRaisedLocal
+  } : null;
+
+  $: allTiles = localTile ? [localTile, ...remoteTiles] : remoteTiles;
+
+  // Screen share — auto-pins the sharer's screen as the main view
+  $: screenShareTile = allTiles.find((t) => t.screenShareTrack) ?? null;
+
+  // Reset pin if the pinned participant has left the call
+  $: if (pinnedId && !allTiles.find((t) => t.id === pinnedId)) {
+    pinnedId = null;
+  }
+
+  $: pinnedTile = pinnedId
+    ? allTiles.find((t) => t.id === pinnedId) ?? null
+    : screenShareTile;
+
+  $: isSpotlight = Boolean(pinnedTile);
+  $: mainIsScreenShare = Boolean(pinnedTile?.screenShareTrack);
+  $: mainTrack = mainIsScreenShare ? pinnedTile?.screenShareTrack : pinnedTile?.videoTrack;
+  $: thumbnailTiles = pinnedTile ? allTiles.filter((t) => t.id !== pinnedTile.id) : [];
+
+  $: isScreenSharing = Boolean(localScreenShareTrack);
+
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
-  $: totalParticipants = 1 + remoteTiles.length;
-  $: gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : 3;
+  $: totalParticipants = allTiles.length;
+  $: gridCols =
+    totalParticipants <= 1 ? 1 :
+    totalParticipants <= 2 ? 2 :
+    totalParticipants <= 4 ? 2 :
+    totalParticipants <= 9 ? 3 : 4;
+  $: gridRows = Math.ceil(totalParticipants / gridCols);
+  // True when the last tile occupies a row by itself (e.g. 3 tiles in 2 cols)
+  $: lastTileAlone = totalParticipants > 1 && totalParticipants % gridCols !== 0;
   $: roomDisplayId = session.roomName ?? session.callId ?? 'N/A';
+
+  // ── Add people ──────────────────────────────────────
+  $: existingParticipantIds = new Set([
+    $authStore.user?.id,
+    $callStore.localParticipant?.identity,
+    ...$callStore.remoteParticipants.map((p) => p.identity)
+  ].filter((id): id is string => Boolean(id)));
+
+  $: filteredContacts = contacts.filter((c) => {
+    if (!c.id || existingParticipantIds.has(c.id)) return false;
+    // Hide contacts who have been successfully invited and haven't rejected yet
+    const status = inviteStatuses.get(c.id);
+    if (status === 'invited' || status === 'inviting') return false;
+    if (!contactSearch.trim()) return true;
+    const q = contactSearch.trim().toLowerCase();
+    return (c.displayName ?? '').toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q);
+  });
+
+  // Contacts currently showing "Invite Sent" or "Rejected" banners above the list
+  $: pendingContacts = contacts.filter((c) => {
+    if (!c.id) return false;
+    const status = inviteStatuses.get(c.id);
+    return status === 'invited' || status === 'inviting' || status === 'rejected';
+  });
+
+  async function openAddPeople() {
+    showAddPeople = true;
+    addPeopleError = '';
+    if (contacts.length === 0 && !contactsLoading) {
+      contactsLoading = true;
+      contactsError = '';
+      try {
+        contacts = await getContacts();
+      } catch (e) {
+        contactsError = getCallApiErrorMessage(e, 'Unable to load contacts.');
+      } finally {
+        contactsLoading = false;
+      }
+    }
+  }
+
+  function closeAddPeople() {
+    showAddPeople = false;
+  }
+
+  async function handleAddParticipant(userId: string) {
+    if (!session.callId || addingUserId) return;
+    addingUserId = userId;
+    addPeopleError = '';
+    inviteStatuses = new Map(inviteStatuses).set(userId, 'inviting');
+    try {
+      await addParticipant(session.callId, userId);
+      inviteStatuses = new Map(inviteStatuses).set(userId, 'invited');
+    } catch (e) {
+      inviteStatuses.delete(userId);
+      inviteStatuses = new Map(inviteStatuses);
+      addPeopleError = getCallApiErrorMessage(e, 'Unable to add this person to the call.');
+    } finally {
+      addingUserId = null;
+    }
+  }
+
+  // Watch for rejections so we can update the button state in real time.
+  const unsubscribeCallEvents = callLifecycleEvents.subscribe((event) => {
+    if (!event || event.type !== 'call:participant-rejected' || !event.userId) return;
+    const uid = event.userId;
+    // Clear any existing reset timer for this user.
+    const existing = rejectionResetTimers.get(uid);
+    if (existing) clearTimeout(existing);
+    // Show "Rejected" briefly, then reset to "Add" so they can be re-invited.
+    inviteStatuses = new Map(inviteStatuses).set(uid, 'rejected');
+    const timer = setTimeout(() => {
+      inviteStatuses.delete(uid);
+      inviteStatuses = new Map(inviteStatuses);
+      rejectionResetTimers.delete(uid);
+    }, 4000);
+    rejectionResetTimers.set(uid, timer);
+  });
 </script>
 
 <!-- Full-screen meeting room overlay -->
-<div class="meeting-room" aria-label="Meeting room">
+<div class="meeting-room" class:is-fullscreen={isFullscreen} aria-label="Meeting room" bind:this={meetingRoomEl}>
 
   <!-- Hidden audio tracks -->
   <div class="audio-sink" aria-hidden="true">
@@ -276,36 +549,83 @@
   </header>
 
   <!-- ── Video stage ─────────────────────────────── -->
-  <main class="video-stage" aria-label="Participants">
-    <div
-      class="participants-grid"
-      style="--cols: {gridCols}"
-      aria-label="{totalParticipants} participant{totalParticipants !== 1 ? 's' : ''}"
-    >
-      <!-- Local tile -->
-      <ParticipantTile
-        track={localVideoTrack}
-        name="You"
-        label="Your video"
-        isActive={isLocalSpeaking}
-        isMuted={!isMicrophoneEnabled}
-        isCameraOff={!isCameraEnabled}
-        mirror={true}
-        isLocal={true}
-      />
+  <main class="video-stage" aria-label="Participants" class:is-spotlight={isSpotlight}>
+    {#if isSpotlight && pinnedTile}
+      <!-- ── Spotlight layout: main tile + thumbnail strip ── -->
+      <div class="spotlight-layout">
+        <div class="spotlight-main" in:fade={{ duration: 220 }}>
+          <ParticipantTile
+            track={mainTrack}
+            name={pinnedTile.name}
+            label="{pinnedTile.name} {mainIsScreenShare ? 'screen share' : 'video'}"
+            isActive={pinnedTile.isActive}
+            isMuted={pinnedTile.isMuted}
+            isCameraOff={mainIsScreenShare ? false : pinnedTile.isCameraOff}
+            mirror={pinnedTile.isLocal && !mainIsScreenShare}
+            isLocal={pinnedTile.isLocal}
+            isPinned={true}
+            isHandRaised={pinnedTile.isHandRaised}
+            networkQuality={pinnedTile.networkQuality}
+            isScreenShare={mainIsScreenShare}
+            on:togglePin={() => togglePin(pinnedTile.id)}
+          />
+        </div>
 
-      <!-- Remote tiles -->
-      {#each remoteTiles as tile (tile.id)}
-        <ParticipantTile
-          track={tile.videoTrack}
-          name={tile.name}
-          label="{tile.name} video"
-          isActive={tile.isActive}
-          isMuted={tile.isMuted}
-          isCameraOff={tile.isCameraOff}
-        />
-      {/each}
-    </div>
+        {#if thumbnailTiles.length > 0}
+          <div class="thumbnail-strip" aria-label="Other participants">
+            {#each thumbnailTiles as tile (tile.id)}
+              <div class="thumbnail-item" in:scale={{ duration: 200, start: 0.85 }} out:fade={{ duration: 150 }}>
+                <ParticipantTile
+                  track={tile.videoTrack}
+                  name={tile.name}
+                  label="{tile.name} video"
+                  isActive={tile.isActive}
+                  isMuted={tile.isMuted}
+                  isCameraOff={tile.isCameraOff}
+                  mirror={tile.isLocal}
+                  isLocal={tile.isLocal}
+                  isPinned={false}
+                  isHandRaised={tile.isHandRaised}
+                  networkQuality={tile.networkQuality}
+                  on:togglePin={() => togglePin(tile.id)}
+                />
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {:else}
+      <!-- ── Grid layout: responsive grid of all participants ── -->
+      <div
+        class="participants-grid"
+        style="--cols: {gridCols}; --rows: {gridRows}"
+        aria-label="{totalParticipants} participant{totalParticipants !== 1 ? 's' : ''}"
+      >
+        {#each allTiles as tile, i (tile.id)}
+          <div
+            class="grid-item"
+            class:grid-item--center-last={lastTileAlone && i === allTiles.length - 1}
+            in:scale={{ duration: 220, start: 0.9 }}
+            out:fade={{ duration: 150 }}
+          >
+            <ParticipantTile
+              track={tile.videoTrack}
+              name={tile.name}
+              label="{tile.name} video"
+              isActive={tile.isActive}
+              isMuted={tile.isMuted}
+              isCameraOff={tile.isCameraOff}
+              mirror={tile.isLocal}
+              isLocal={tile.isLocal}
+              isPinned={false}
+              isHandRaised={tile.isHandRaised}
+              networkQuality={tile.networkQuality}
+              on:togglePin={() => togglePin(tile.id)}
+            />
+          </div>
+        {/each}
+      </div>
+    {/if}
 
     <!-- Waiting overlay (shown when no remote participants yet) -->
     {#if remoteTiles.length === 0}
@@ -430,23 +750,231 @@
         <span>{isRecordingCall ? 'Stop rec' : 'Record'}</span>
       </button>
 
-      <!-- Screen share (placeholder) -->
+      <!-- Add people -->
       <button
         type="button"
-        class="ctrl-btn ctrl-disabled-feature"
-        disabled
-        aria-label="Share screen (coming soon)"
-        title="Share screen (coming soon)"
+        class="ctrl-btn"
+        aria-label="Add people to this call"
+        title="Add people"
+        on:click={openAddPeople}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 20a6.5 6.5 0 0114 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M18 8v6M15 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Add</span>
+      </button>
+
+      <!-- Screen share -->
+      <button
+        type="button"
+        class="ctrl-btn"
+        class:ctrl-active={isScreenSharing}
+        disabled={!isConnected || isTogglingScreenShare}
+        aria-pressed={isScreenSharing}
+        aria-label={isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
+        title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
+        on:click={toggleScreenShare}
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
           <path d="M8 20h8M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span>Share</span>
+        <span>{isScreenSharing ? 'Sharing' : 'Share'}</span>
+      </button>
+
+      <!-- Raise hand -->
+      <button
+        type="button"
+        class="ctrl-btn"
+        class:ctrl-active={isHandRaisedLocal}
+        disabled={!isConnected}
+        aria-pressed={isHandRaisedLocal}
+        aria-label={isHandRaisedLocal ? 'Lower hand' : 'Raise hand'}
+        title={isHandRaisedLocal ? 'Lower hand' : 'Raise hand'}
+        on:click={toggleRaiseHand}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 11.5V4.5a1.5 1.5 0 013 0v6M12 10.5V3a1.5 1.5 0 013 0v7.5M15 10.5V5a1.5 1.5 0 013 0v9a6 6 0 01-6 6h-1a6 6 0 01-5-2.7L4 13.8a1.4 1.4 0 012.3-1.6L8 14"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{isHandRaisedLocal ? 'Lower' : 'Raise'}</span>
+      </button>
+
+      <!-- Video quality -->
+      <div class="quality-picker-wrap">
+        <button
+          type="button"
+          class="ctrl-btn"
+          class:ctrl-active={videoQualityProfile !== 'auto'}
+          aria-label="Video quality: {QUALITY_LABELS[videoQualityProfile]}"
+          title="Video quality"
+          on:click={() => (showQualityMenu = !showQualityMenu)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path d="M8 12h4M14 9l2 3-2 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>{videoQualityProfile === 'auto' ? 'Auto' : videoQualityProfile === 'data-saver' ? 'Save' : videoQualityProfile === 'hd' ? 'HD' : 'FHD'}</span>
+        </button>
+
+        {#if showQualityMenu}
+          <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+          <div class="quality-backdrop" on:click={() => (showQualityMenu = false)}></div>
+          <div class="quality-menu" role="menu" aria-label="Select video quality">
+            {#each (['auto', 'data-saver', 'hd', 'fhd'] as VideoQualityProfile[]) as profile}
+              <button
+                type="button"
+                role="menuitem"
+                class="quality-option"
+                class:quality-option--active={videoQualityProfile === profile}
+                on:click={() => applyVideoQualityProfile(profile)}
+              >
+                <span class="quality-check" aria-hidden="true">{videoQualityProfile === profile ? '✓' : ''}</span>
+                {QUALITY_LABELS[profile]}
+                {#if profile === 'hd'}
+                  <span class="quality-badge">Recommended</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Full screen -->
+      <button
+        type="button"
+        class="ctrl-btn"
+        class:ctrl-active={isFullscreen}
+        aria-pressed={isFullscreen}
+        aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+        title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+        on:click={toggleFullscreen}
+      >
+        {#if isFullscreen}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 4H5a1 1 0 00-1 1v4M15 4h4a1 1 0 011 1v4M9 20H5a1 1 0 01-1-1v-4M15 20h4a1 1 0 001-1v-4"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {/if}
+        <span>{isFullscreen ? 'Exit' : 'Full'}</span>
       </button>
     </div>
   </div>
+
+  <!-- ── Add people modal ────────────────────────────── -->
+  {#if showAddPeople}
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div
+      class="add-people-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add people to call"
+      tabindex="-1"
+      on:click={closeAddPeople}
+    >
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+      <div class="add-people-card" on:click|stopPropagation>
+        <header class="add-people-header">
+          <h2>Add people</h2>
+          <button type="button" class="add-people-close" aria-label="Close" on:click={closeAddPeople}>✕</button>
+        </header>
+
+        <input
+          type="search"
+          class="add-people-search"
+          placeholder="Search contacts…"
+          bind:value={contactSearch}
+          aria-label="Search contacts"
+        />
+
+        {#if addPeopleError}
+          <p class="add-people-error" role="alert">{addPeopleError}</p>
+        {/if}
+
+        <div class="add-people-list">
+          <!-- Pending rows (Invite Sent / Rejected) always shown at the top -->
+          {#each pendingContacts as contact (contact.id)}
+            {@const status = inviteStatuses.get(contact.id)}
+            <div class="add-people-row" class:add-people-row-rejected={status === 'rejected'}>
+              <div class="add-people-avatar" aria-hidden="true">
+                {#if status === 'invited'}
+                  <span>✓</span>
+                {:else if status === 'rejected'}
+                  <span>✕</span>
+                {:else if contact.avatarUrl}
+                  <img src={contact.avatarUrl} alt="" />
+                {:else}
+                  <span>{(contact.displayName ?? contact.email ?? '?').slice(0, 1).toUpperCase()}</span>
+                {/if}
+              </div>
+              <div class="add-people-name">
+                <span class="add-people-display-name">{contact.displayName ?? contact.email}</span>
+                {#if contact.displayName}
+                  <span class="add-people-email">{contact.email}</span>
+                {/if}
+              </div>
+              {#if status === 'invited'}
+                <span class="add-people-status-label add-people-status-invited">Invite Sent</span>
+              {:else if status === 'rejected'}
+                <span class="add-people-status-label add-people-status-rejected">Declined</span>
+              {:else}
+                <span class="add-people-status-label add-people-status-invited">Sending…</span>
+              {/if}
+            </div>
+          {/each}
+
+          <!-- Separator when both pending and available contacts exist -->
+          {#if pendingContacts.length > 0 && filteredContacts.length > 0}
+            <div class="add-people-divider" aria-hidden="true"></div>
+          {/if}
+
+          {#if contactsLoading}
+            <p class="add-people-status">Loading contacts…</p>
+          {:else if contactsError}
+            <p class="add-people-status add-people-error">{contactsError}</p>
+          {:else if filteredContacts.length === 0 && pendingContacts.length === 0}
+            <p class="add-people-status">No contacts to add.</p>
+          {:else}
+            {#each filteredContacts as contact (contact.id)}
+              {@const status = inviteStatuses.get(contact.id)}
+              <div class="add-people-row">
+                <div class="add-people-avatar" aria-hidden="true">
+                  {#if contact.avatarUrl}
+                    <img src={contact.avatarUrl} alt="" />
+                  {:else}
+                    <span>{(contact.displayName ?? contact.email ?? '?').slice(0, 1).toUpperCase()}</span>
+                  {/if}
+                </div>
+                <div class="add-people-name">
+                  <span class="add-people-display-name">{contact.displayName ?? contact.email}</span>
+                  {#if contact.displayName}
+                    <span class="add-people-email">{contact.email}</span>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  class="add-people-add-btn"
+                  class:add-people-add-btn--retry={status === 'rejected'}
+                  disabled={Boolean(addingUserId)}
+                  on:click={() => handleAddParticipant(contact.id)}
+                >
+                  {status === 'rejected' ? 'Add Again' : 'Add'}
+                </button>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style lang="postcss">
@@ -609,21 +1137,121 @@
     padding: 0.75rem;
     min-block-size: 0;
     overflow: hidden;
+    transition: padding 220ms ease;
+  }
+
+  .video-stage.is-spotlight {
+    align-items: stretch;
+    justify-content: stretch;
   }
 
   .participants-grid {
     display: grid;
     grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
     gap: 0.5rem;
     inline-size: 100%;
     block-size: 100%;
-    align-content: center;
   }
 
-  /* Single participant: max width constraint + center */
+  /* Single participant: cap width so the tile doesn't stretch too wide */
   .participants-grid[style*='--cols: 1'] {
     max-inline-size: min(100%, 72rem);
     margin-inline: auto;
+  }
+
+  /* Tiles inside the grid fill their cell; aspect-ratio is enforced by the
+     cell dimensions, not by the tile itself, so nothing gets clipped. */
+  .participants-grid :global(.tile) {
+    aspect-ratio: auto;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .grid-item {
+    min-block-size: 0;
+    min-inline-size: 0;
+  }
+
+  /* Last tile that sits alone in its row (e.g. 3 tiles in a 2-col grid):
+     span the full row and center it at half-width so it matches its siblings. */
+  .grid-item--center-last {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+  }
+
+  .grid-item--center-last :global(.tile) {
+    max-inline-size: calc(100% / var(--cols) - var(--cols) * 0.25rem);
+  }
+
+  /* ── Spotlight layout: large main view + thumbnail strip ── */
+  .spotlight-layout {
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    block-size: 100%;
+    gap: 0.5rem;
+    min-block-size: 0;
+  }
+
+  .spotlight-main {
+    flex: 1;
+    min-block-size: 0;
+    min-inline-size: 0;
+    display: flex;
+  }
+
+  .spotlight-main :global(.tile) {
+    inline-size: 100%;
+    block-size: 100%;
+    aspect-ratio: auto;
+  }
+
+  /* Thumbnail strip — horizontal row at the bottom on narrow/medium screens */
+  .thumbnail-strip {
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block-end: 0.25rem;
+    scrollbar-width: thin;
+  }
+
+  .thumbnail-item {
+    flex: 0 0 auto;
+    inline-size: clamp(7rem, 18vw, 11rem);
+    aspect-ratio: 16 / 9;
+  }
+
+  .thumbnail-item :global(.tile) {
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  /* Wide screens: thumbnail strip becomes a vertical sidebar on the right */
+  @media (min-width: 1024px) {
+    .spotlight-layout {
+      flex-direction: row;
+    }
+
+    .thumbnail-strip {
+      flex-direction: column;
+      flex: 0 0 auto;
+      inline-size: clamp(10rem, 16vw, 14rem);
+      block-size: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-block-end: 0;
+      padding-inline-end: 0.25rem;
+    }
+
+    .thumbnail-item {
+      inline-size: 100%;
+      flex: 0 0 auto;
+    }
   }
 
   /* ── Waiting overlay ─────────────────────────────── */
@@ -724,6 +1352,8 @@
     background: rgba(10, 15, 26, 0.92);
     border-block-start: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
 
   .ctrl-group {
@@ -825,6 +1455,290 @@
     box-shadow: 0 6px 20px rgba(220, 38, 38, 0.45);
   }
 
+  /* ── Quality picker ─────────────────────────────── */
+  .quality-picker-wrap {
+    position: relative;
+  }
+
+  .quality-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+  }
+
+  .quality-menu {
+    position: absolute;
+    inset-block-end: calc(100% + 0.5rem);
+    inset-inline-end: 0;
+    z-index: 65;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-inline-size: 11rem;
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    padding: 0.375rem;
+    animation: quality-pop 120ms ease both;
+  }
+
+  @keyframes quality-pop {
+    from { opacity: 0; transform: translateY(4px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .quality-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .quality-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+
+  .quality-option--active {
+    color: #7ecfff;
+    background: rgba(78, 135, 255, 0.12);
+  }
+
+  .quality-check {
+    inline-size: 0.875rem;
+    font-size: 0.6875rem;
+    color: #7ecfff;
+    flex-shrink: 0;
+  }
+
+  .quality-badge {
+    margin-inline-start: auto;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.12);
+    border-radius: 999px;
+    padding: 0.1rem 0.375rem;
+    flex-shrink: 0;
+  }
+
+  /* ── Add people modal ────────────────────────────── */
+  .add-people-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: grid;
+    place-items: center;
+    background: rgba(10, 15, 26, 0.72);
+    backdrop-filter: blur(6px);
+    padding: 1rem;
+  }
+
+  .add-people-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 24rem;
+    max-height: 70vh;
+    border-radius: var(--radius-lg, 16px);
+    background: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    padding: 1.25rem;
+    color: rgba(255, 255, 255, 0.88);
+    font-family: var(--font-sans);
+  }
+
+  .add-people-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .add-people-header h2 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+
+  .add-people-close {
+    border: none;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: 999px;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+
+  .add-people-close:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+
+  .add-people-search {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.625rem 0.75rem;
+    color: #fff;
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+  }
+
+  .add-people-search:focus {
+    outline: 2px solid rgba(78, 135, 255, 0.6);
+    outline-offset: 1px;
+  }
+
+  .add-people-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    overflow-y: auto;
+  }
+
+  .add-people-status {
+    margin: 0.5rem 0;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+  }
+
+  .add-people-error {
+    color: #fca5a5;
+    font-size: 0.8125rem;
+    margin: 0;
+  }
+
+  .add-people-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem;
+    border-radius: 10px;
+  }
+
+  .add-people-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .add-people-avatar {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: var(--color-secondary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9375rem;
+  }
+
+  .add-people-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .add-people-name {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .add-people-display-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .add-people-email {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .add-people-add-btn {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgba(78, 135, 255, 0.18);
+    color: #7ecfff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.375rem 0.875rem;
+    cursor: pointer;
+  }
+
+  .add-people-add-btn:hover:not(:disabled) {
+    background: rgba(78, 135, 255, 0.3);
+  }
+
+  .add-people-add-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .add-people-row-rejected {
+    opacity: 0.75;
+  }
+
+  .add-people-status-label {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .add-people-status-invited {
+    color: #34d399;
+  }
+
+  .add-people-status-rejected {
+    color: #f87171;
+  }
+
+  .add-people-add-btn--retry {
+    background: rgba(251, 146, 60, 0.18);
+    color: #fb923c;
+  }
+
+  .add-people-add-btn--retry:hover:not(:disabled) {
+    background: rgba(251, 146, 60, 0.3);
+  }
+
+  .add-people-divider {
+    block-size: 1px;
+    background: rgba(255, 255, 255, 0.07);
+    margin-block: 0.25rem;
+  }
+
   /* ── Responsive ──────────────────────────────────── */
   @media (max-width: 640px) {
     .meeting-header { padding: 0.5rem 0.75rem; }
@@ -836,8 +1750,20 @@
       gap: 0.375rem;
     }
 
+    /* Mobile: single column, one tile per row stacked vertically */
     .participants-grid {
       grid-template-columns: 1fr !important;
+      grid-template-rows: repeat(var(--count, auto), minmax(0, 1fr)) !important;
+    }
+
+    /* On mobile every tile spans its own row, so centering is irrelevant */
+    .grid-item--center-last {
+      grid-column: auto;
+      display: block;
+    }
+
+    .grid-item--center-last :global(.tile) {
+      max-inline-size: 100%;
     }
 
     .controls-bar { gap: 0.375rem; padding: 0.5rem 0.75rem 0.75rem; }
@@ -854,6 +1780,7 @@
     }
   }
 
+  /* Tablet: reduce 3-col grid to 2 cols, and recompute rows on the spot */
   @media (max-width: 900px) {
     .participants-grid[style*='--cols: 3'] {
       grid-template-columns: repeat(2, 1fr) !important;

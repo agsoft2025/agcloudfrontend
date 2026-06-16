@@ -4,6 +4,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPresets,
   type CreateLocalTracksOptions,
   type LocalTrack,
   type LocalTrackPublication,
@@ -81,6 +82,16 @@ export class LiveKitClient {
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
+      // Default video capture at 720p 30fps; publishers override per-track.
+      videoCaptureDefaults: {
+        resolution: { width: 1280, height: 720, frameRate: 30 }
+      },
+      // Default publish settings — individual track publishes can override.
+      publishDefaults: {
+        videoEncoding: { maxBitrate: 2_000_000, maxFramerate: 30 },
+        screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 15 },
+        audioPreset: undefined
+      },
       ...options.roomOptions
     });
 
@@ -147,16 +158,23 @@ export class LiveKitClient {
 
   async setCameraEnabled(enabled: boolean): Promise<LocalTrackPublication | undefined> {
     try {
-      return await this.requireRoom().localParticipant.setCameraEnabled(enabled, {
-        resolution: {
-          width: 1280,
-          height: 720,
-          frameRate: 30
+      return await this.requireRoom().localParticipant.setCameraEnabled(
+        enabled,
+        {
+          // Capture at 720p 30fps; device will downscale for simulcast layers.
+          resolution: { width: 1280, height: 720, frameRate: 30 }
+        },
+        {
+          videoCodec: 'vp8',
+          // Simulcast sends three quality layers (low/mid/high) so receivers
+          // automatically get the best quality their bandwidth supports, without
+          // the publisher needing to re-negotiate the stream.
+          simulcast: true,
+          // Three simulcast layers: low → mid → high (720p at 2 Mbps).
+          // LiveKit's adaptive stream picks the appropriate layer per receiver.
+          videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360, VideoPresets.h720]
         }
-      }, {
-        videoCodec: 'vp8',
-        simulcast: false
-      });
+      );
     } catch (e) {
       if (isCameraUnavailableError(e)) {
         console.warn('Camera device unavailable, disabling video for this participant.', e);

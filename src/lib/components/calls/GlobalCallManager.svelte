@@ -17,6 +17,7 @@
 -->
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { authStore } from '$lib/stores/auth.store';
   import { activeCallStore, type ActiveCallState } from '$lib/stores/active-call.store';
   import { initCallSignaling, teardownCallSignaling } from '$lib/realtime/call-signaling';
@@ -32,7 +33,9 @@
   import { bindCallEvents } from '$lib/livekit/useCall';
   import { callStore } from '$lib/stores/call.store';
   import IncomingCallOverlay from '$lib/components/molecules/IncomingCallOverlay.svelte';
+  import IncomingCallNotifications from './IncomingCallNotifications.svelte';
   import CallSession, { type ActiveCallSession } from './CallSession.svelte';
+  import type { IncomingInvite } from '$lib/stores/active-call.store';
 
   let cleanupLiveKitEvents: (() => void) | null = null;
   let session: ActiveCallSession | null = null;
@@ -41,6 +44,12 @@
 
   $: state = $activeCallStore;
   $: handlePhaseChange(state);
+
+  // Hide the banner for whichever invite is already driving the full-screen
+  // incoming-call overlay, to avoid showing duplicate UI for the same call.
+  $: bannerInvites = state.incomingInvites.filter(
+    (invite) => !(state.phase === 'incoming-ringing' && state.callId === invite.callId)
+  );
 
   onMount(() => {
     if ($authStore.isAuthenticated) {
@@ -180,7 +189,81 @@
       activeCallStore.reset();
     }
   }
+
+  // ── Notification banner actions ──────────────────────────────────
+  /** Join a call from the persistent notification banner (new invite, re-invite, or "Call in Progress"). */
+  async function handleJoinInvite(invite: IncomingInvite) {
+    const current = get(activeCallStore);
+
+    // If we're on a different call already, leave it first.
+    if (current.phase !== 'idle' && current.callId !== invite.callId) {
+      if (current.phase === 'in-call' || current.phase === 'connecting') {
+        if (current.callId) {
+          try {
+            await endCall(current.callId);
+          } catch (err) {
+            console.error('[GlobalCallManager] failed to leave current call:', err);
+          }
+        }
+        await cleanupCallSession();
+      } else if (current.phase === 'outgoing-ringing' && current.callId) {
+        try {
+          await endCall(current.callId);
+        } catch (err) {
+          console.error('[GlobalCallManager] failed to cancel outgoing call:', err);
+        }
+      }
+      activeCallStore.reset();
+    }
+
+    try {
+      const response = await acceptCall(invite.callId);
+      if (!hasLiveKitCredentials(response)) {
+        throw new Error('Call accepted but no LiveKit credentials were returned.');
+      }
+
+      const liveKit = { token: response.token, roomName: response.roomName, url: response.url };
+      activeCallStore.setIncoming({
+        callId: invite.callId,
+        peer: invite.peer,
+        callType: invite.callType,
+        callMode: invite.callMode
+      });
+      activeCallStore.setLiveKit(liveKit);
+      activeCallStore.setConnecting();
+    } catch (err) {
+      activeCallStore.setError(getCallApiErrorMessage(err, 'Unable to join the call.'));
+    } finally {
+      activeCallStore.removeIncomingInvite(invite.callId);
+    }
+  }
+
+  /** Dismiss a notification banner (declines the invitation; it can be re-sent later). */
+  async function handleDismissInvite(invite: IncomingInvite) {
+    if (invite.status !== 'ended') {
+      try {
+        await rejectCall(invite.callId);
+      } catch (err) {
+        console.error('[GlobalCallManager] dismiss/reject failed:', err);
+      }
+    }
+
+    const current = get(activeCallStore);
+    if (current.phase === 'incoming-ringing' && current.callId === invite.callId) {
+      activeCallStore.reset();
+    }
+
+    activeCallStore.removeIncomingInvite(invite.callId);
+  }
 </script>
+
+{#if bannerInvites.length > 0}
+  <IncomingCallNotifications
+    invites={bannerInvites}
+    on:join={(e) => handleJoinInvite(e.detail)}
+    on:dismiss={(e) => handleDismissInvite(e.detail)}
+  />
+{/if}
 
 {#if state.phase === 'incoming-ringing' && state.peer}
   <IncomingCallOverlay
