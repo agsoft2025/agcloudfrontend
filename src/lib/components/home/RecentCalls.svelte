@@ -347,7 +347,7 @@
     block-size: 100%;
     inline-size: 22rem;
     flex-shrink: 0;
-    background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+    background: color-mix(in srgb, var(--color-surface-raised) 55%, var(--color-background));
     border-inline-start: 1px solid var(--color-border);
   }
 
@@ -357,9 +357,9 @@
     align-items: center;
     flex-shrink: 0;
     block-size: 4rem;
-    padding: 0 var(--space-lg);
+    padding: 0 1.25rem;
     border-block-end: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 90%, transparent);
     backdrop-filter: blur(12px);
     position: sticky;
     inset-block-start: 0;
@@ -372,6 +372,7 @@
     font-size: 1.0625rem;
     font-weight: 700;
     color: var(--color-text);
+    letter-spacing: -0.01em;
   }
 
   /* ── Body ───────────────────────────────────────────────────── */
@@ -379,7 +380,7 @@
     flex: 1;
     min-block-size: 0;
     overflow-y: auto;
-    padding: var(--space-md);
+    padding: 0.875rem 0.875rem 0.875rem;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
   }
@@ -391,28 +392,40 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: 0.5rem;
   }
 
   .rc-item {
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     box-shadow: var(--shadow-xs);
     overflow: hidden;
-    transition: box-shadow 140ms ease;
+    transition:
+      box-shadow 150ms ease,
+      border-color 150ms ease,
+      transform 120ms ease;
   }
 
   .rc-item:hover {
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-border-strong);
+    transform: translateY(-1px);
   }
 
   .rc-item--missed {
     border-inline-start: 3px solid var(--color-error);
+    background: color-mix(in srgb, var(--color-error-bg) 60%, var(--color-surface));
+  }
+
+  .rc-item--missed:hover {
+    border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border));
+    border-inline-start-color: var(--color-error);
   }
 
   .rc-item--active {
     border-inline-start: 3px solid #16a34a;
+    background: color-mix(in srgb, var(--color-success-bg) 50%, var(--color-surface));
   }
 
   .rc-item--active .rc-actions {
@@ -431,27 +444,28 @@
 
   @keyframes rc-live-pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
+    50% { opacity: 0.3; }
   }
 
   .rc-item-inner {
     display: grid;
     grid-template-columns: 2.5rem minmax(0, 1fr);
     align-items: center;
-    gap: var(--space-md);
-    padding: 0.75rem var(--space-md);
+    gap: 0.875rem;
+    padding: 0.75rem 0.875rem 0.625rem;
   }
 
   /* ── Avatar ─────────────────────────────────────────────────── */
   .rc-avatar {
     display: grid;
     place-items: center;
+    flex-shrink: 0;
   }
 
   /* ── Info ───────────────────────────────────────────────────── */
   .rc-info {
     display: grid;
-    gap: 0.25rem;
+    gap: 0.3rem;
     min-inline-size: 0;
   }
 
@@ -459,25 +473,28 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-xs);
+    gap: 0.5rem;
   }
 
   .rc-name {
     font-family: var(--font-sans);
-    font-size: 0.9375rem;
-    font-weight: 600;
+    font-size: 0.875rem;
+    font-weight: 700;
     color: var(--color-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: -0.01em;
   }
 
   .rc-ts {
     font-family: var(--font-sans);
-    font-size: 0.6875rem;
-    color: var(--color-muted);
+    font-size: 0.625rem;
+    color: var(--color-subtle);
     white-space: nowrap;
     flex-shrink: 0;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .rc-direction {
@@ -492,10 +509,17 @@
 
   .rc-direction[data-direction='missed'] {
     color: var(--color-error);
+    font-weight: 700;
   }
 
   .rc-direction[data-direction='outgoing'] {
     color: var(--color-secondary);
+    font-weight: 600;
+  }
+
+  .rc-direction[data-direction='incoming'] {
+    color: var(--color-success);
+    font-weight: 600;
   }
 
   .rc-dur {
@@ -506,9 +530,9 @@
   /* ── Hover actions ──────────────────────────────────────────── */
   .rc-actions {
     display: flex;
-    gap: var(--space-xs);
-    padding: 0 var(--space-md) 0.625rem;
-    opacity: 0;
+    gap: 0.5rem;
+    padding: 0 0.875rem 0.625rem;
+    opacity: 1;
     pointer-events: none;
     transition: opacity 140ms ease;
   }
@@ -524,20 +548,27 @@
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    padding: 0.375rem var(--space-sm);
-    border-radius: var(--radius-sm);
-    border: 1px solid color-mix(in srgb, var(--color-secondary) 28%, transparent);
-    background: color-mix(in srgb, var(--color-secondary) 10%, transparent);
+    padding: 0.4375rem 0.75rem;
+    border-radius: var(--radius-lg);
+    border: 1.5px solid var(--color-secondary);
+    background: color-mix(in srgb, var(--color-secondary) 8%, transparent);
     color: var(--color-secondary);
     font-family: var(--font-sans);
     font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    letter-spacing: -0.005em;
+    transition: background-color 120ms ease, box-shadow 120ms ease, transform 100ms ease;
   }
 
   .rc-call-back-btn:hover {
-    background: color-mix(in srgb, var(--color-secondary) 18%, transparent);
+    background: color-mix(in srgb, var(--color-secondary) 16%, transparent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-secondary) 20%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .rc-call-back-btn:active {
+    transform: translateY(0);
   }
 
   .rc-call-back-btn:focus-visible {
@@ -551,20 +582,21 @@
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    padding: 0.375rem var(--space-sm);
-    border-radius: var(--radius-sm);
-    border: 1px solid color-mix(in srgb, #16a34a 30%, transparent);
-    background: color-mix(in srgb, #16a34a 12%, transparent);
+    padding: 0.4375rem 0.75rem;
+    border-radius: var(--radius-lg);
+    border: 1.5px solid #16a34a;
+    background: color-mix(in srgb, #16a34a 10%, transparent);
     color: #16a34a;
     font-family: var(--font-sans);
     font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 120ms ease;
+    transition: background-color 120ms ease, transform 100ms ease;
   }
 
   .rc-join-btn:hover {
-    background: color-mix(in srgb, #16a34a 20%, transparent);
+    background: color-mix(in srgb, #16a34a 18%, transparent);
+    transform: translateY(-1px);
   }
 
   .rc-join-btn:focus-visible {
@@ -575,19 +607,21 @@
   .rc-more-btn {
     display: grid;
     place-items: center;
-    inline-size: 2rem;
-    block-size: 2rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
+    inline-size: 2.125rem;
+    block-size: 2.125rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--color-border);
     background: transparent;
     color: var(--color-muted);
     cursor: pointer;
     padding: 0;
-    transition: background-color 120ms ease;
+    flex-shrink: 0;
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
   }
 
   .rc-more-btn:hover {
     background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
     color: var(--color-text);
   }
 
@@ -602,11 +636,15 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
-    padding: var(--space-xl) var(--space-lg);
+    gap: 0.625rem;
+    padding: 3rem 1.5rem;
     text-align: center;
     color: var(--color-muted);
     block-size: 100%;
+  }
+
+  .rc-empty svg {
+    opacity: 0.4;
   }
 
   .rc-empty-title {
@@ -618,36 +656,45 @@
   }
 
   .rc-retry-btn {
-    padding: 0.375rem 1rem;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
+    padding: 0.4375rem 1.125rem;
+    border: 1.5px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
     background: transparent;
     color: var(--color-text);
     font-family: var(--font-sans);
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
+    transition: background-color 140ms ease, border-color 140ms ease;
   }
 
   .rc-retry-btn:hover {
     background: var(--color-surface-raised);
+    border-color: var(--color-secondary);
   }
 
   /* ── Footer: Emergency SOS ──────────────────────────────────── */
   .rc-footer {
     flex-shrink: 0;
-    padding: var(--space-md);
+    padding: 0.875rem;
     border-block-start: 1px solid var(--color-border);
   }
 
   .rc-sos {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: 0.625rem var(--space-md);
-    border-radius: var(--radius-md);
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-radius: var(--radius-lg);
     background: var(--color-error-bg);
     border: 1px solid var(--color-error-border);
+    cursor: pointer;
+    transition: box-shadow 150ms ease, transform 120ms ease;
+  }
+
+  .rc-sos:hover {
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--color-error) 12%, transparent);
+    transform: translateY(-1px);
   }
 
   .rc-sos-icon {
@@ -655,10 +702,11 @@
     place-items: center;
     inline-size: 2rem;
     block-size: 2rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--color-error);
     color: #ffffff;
     flex-shrink: 0;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-error) 35%, transparent);
   }
 
   .rc-sos-label {
@@ -667,6 +715,7 @@
     font-size: 0.875rem;
     font-weight: 700;
     color: var(--color-error);
+    letter-spacing: -0.01em;
   }
 
   .rc-sos-btn {

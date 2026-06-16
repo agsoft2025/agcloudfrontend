@@ -8,7 +8,7 @@
 import { get, writable } from 'svelte/store';
 import { connectSocket, disconnectSocket } from './socket';
 import { activeCallStore } from '$lib/stores/active-call.store';
-import { presenceStore, type PresenceStatus } from '$lib/stores/presence.store';
+import { presenceStore } from '$lib/stores/presence.store';
 import type { CallType } from '$lib/api/calls.api';
 
 /**
@@ -25,7 +25,8 @@ function emitLifecycleEvent(type: string, callId: string, userId?: string) {
 
 interface PresenceUpdateEvent {
   userId: string;
-  status: PresenceStatus;
+  /** Accept `unknown` — normalisation happens inside setPresence(). */
+  status: unknown;
   lastSeen?: string;
 }
 

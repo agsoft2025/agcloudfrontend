@@ -38,8 +38,6 @@
   let searchInput: HTMLInputElement;
 
   // ── Derived ────────────────────────────────────────────────────
-  $: presences = $presenceStore.presences;
-
   $: filtered = searchQuery.trim()
     ? contacts.filter((c) => {
         const q = searchQuery.toLowerCase();
@@ -52,17 +50,10 @@
     : contacts;
 
   // ── Helpers ────────────────────────────────────────────────────
-  function getStatus(userId: string): PresenceStatus {
-    return presences.get(userId)?.status ?? 'offline';
-  }
-
-  function getLastSeen(userId: string): string {
-    const p = presences.get(userId);
-    if (!p) return '';
-    if (p.status === 'online') return 'Active now';
-    if (!p.lastSeen) return '';
-
-    const ms = Date.now() - new Date(p.lastSeen).getTime();
+  /** Format a lastSeen ISO timestamp into a relative label. */
+  function formatLastSeen(isoTs?: string): string {
+    if (!isoTs) return '';
+    const ms = Date.now() - new Date(isoTs).getTime();
     const mins = Math.floor(ms / 60_000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;
@@ -137,7 +128,7 @@
       bind:this={searchInput}
       bind:value={searchQuery}
       class="cl-search"
-      type="search"
+      type="text"
       placeholder="Search contacts"
       aria-label="Search contacts"
       autocomplete="off"
@@ -182,8 +173,9 @@
 
     {:else}
       {#each filtered as contact (contact.id)}
-        {@const status = getStatus(contact.id)}
-        {@const lastSeen = getLastSeen(contact.id)}
+        {@const _pres = $presenceStore.presences.get(contact.id)}
+        {@const status = (_pres?.status ?? 'offline') as PresenceStatus}
+        {@const lastSeen = _pres?.status === 'online' ? 'Active now' : formatLastSeen(_pres?.lastSeen)}
         {@const displayName = getDisplayName(contact)}
         {@const isSelected = selectedId === contact.id}
 
@@ -260,10 +252,10 @@
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding: 0 var(--space-lg);
+    padding: 0 1.25rem;
     block-size: 4rem;
     border-block-end: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 92%, transparent);
     backdrop-filter: blur(12px);
     position: sticky;
     inset-block-start: 0;
@@ -272,15 +264,16 @@
 
   .cl-title {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: 1.0625rem;
     font-weight: 700;
     color: var(--color-text);
     font-family: var(--font-sans);
+    letter-spacing: -0.01em;
   }
 
   .cl-header-actions {
     display: flex;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
 
   .cl-icon-btn {
@@ -294,7 +287,7 @@
     color: var(--color-muted);
     cursor: pointer;
     padding: 0;
-    transition: background-color 140ms ease, color 140ms ease;
+    transition: background-color 120ms ease, color 120ms ease;
   }
 
   .cl-icon-btn:hover {
@@ -311,45 +304,55 @@
   .cl-search-wrap {
     position: relative;
     flex-shrink: 0;
-    padding: var(--space-md) var(--space-lg);
+    padding: 0.75rem 1rem;
     border-block-end: 1px solid var(--color-border);
+    background: var(--color-surface);
   }
 
   .cl-search-icon {
     position: absolute;
     inset-block-start: 50%;
-    inset-inline-start: calc(var(--space-lg) + 0.75rem);
-    transform: translateY(-50%);
+    inset-inline-start: calc(1.5rem + 0.75rem);
+    transform: translateY(-110%);
     color: var(--color-muted);
     pointer-events: none;
+    transition: color 120ms ease;
+  }
+
+  .cl-search-wrap:focus-within .cl-search-icon {
+    color: var(--color-secondary);
   }
 
   .cl-search {
     inline-size: 100%;
     block-size: 2.5rem;
-    padding: 0 0.75rem 0 2.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    padding: 0 0.875rem 0 2.625rem;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-lg);
     background: var(--color-surface-raised);
     color: var(--color-text);
     font-family: var(--font-sans);
     font-size: 0.875rem;
     outline: none;
-    transition: border-color 140ms ease, box-shadow 140ms ease;
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
     appearance: none;
   }
 
   .cl-search::placeholder {
-    color: var(--color-muted);
+    color: var(--color-subtle);
   }
 
   .cl-search:focus {
     border-color: var(--color-secondary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 16%, transparent);
+    background: var(--color-surface);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-secondary) 14%, transparent);
   }
 
+  .cl-search::-webkit-search-decoration,
   .cl-search::-webkit-search-cancel-button {
-    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
   }
 
   /* ── Body ───────────────────────────────────────────────────── */
@@ -357,16 +360,16 @@
     flex: 1;
     min-block-size: 0;
     overflow-y: auto;
-    padding: var(--space-md) var(--space-lg);
+    padding: 0.5rem 0.75rem;
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
 
   .cl-skeleton-wrap {
-    padding-block-start: var(--space-xs);
+    padding: 0.375rem 0.25rem;
   }
 
   /* ── Row ────────────────────────────────────────────────────── */
@@ -374,28 +377,38 @@
     display: grid;
     grid-template-columns: 3rem minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-md);
+    gap: 0.875rem;
     padding: 0.625rem 0.75rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     border: 1px solid transparent;
+    border-bottom: 1px solid #ccc;
     cursor: pointer;
     transition:
       background-color 120ms ease,
-      border-color 120ms ease;
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+    outline: none;
   }
 
   .cl-row:hover {
+    background: color-mix(in srgb, var(--color-secondary) 5%, var(--color-surface-raised));
+    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+
+  .cl-row:focus-visible {
+    outline: 2px solid var(--color-secondary);
+    outline-offset: 1px;
     background: var(--color-surface-raised);
-    border-color: color-mix(in srgb, var(--color-border) 50%, transparent);
   }
 
   .cl-row--selected {
-    background: color-mix(in srgb, var(--color-secondary) 8%, transparent);
-    border-color: color-mix(in srgb, var(--color-secondary) 28%, transparent);
+    background: color-mix(in srgb, var(--color-secondary) 9%, var(--color-surface));
+    border-color: color-mix(in srgb, var(--color-secondary) 32%, transparent);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--color-secondary) 10%, transparent);
   }
 
   .cl-row--selected:hover {
-    background: color-mix(in srgb, var(--color-secondary) 12%, transparent);
+    background: color-mix(in srgb, var(--color-secondary) 13%, var(--color-surface));
   }
 
   /* ── Avatar with presence overlay ──────────────────────────── */
@@ -405,24 +418,26 @@
     block-size: 3rem;
     display: grid;
     place-items: center;
+    flex-shrink: 0;
   }
 
-  /* Away dot (online dot is rendered by Avatar's built-in badge) */
+  /* Away dot (online dot rendered by Avatar's built-in badge) */
   .cl-away-dot {
     position: absolute;
-    inset-block-end: 0;
-    inset-inline-end: 0;
-    inline-size: 0.65rem;
-    block-size: 0.65rem;
+    inset-block-end: 1px;
+    inset-inline-end: 1px;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
     border-radius: 999px;
     background: #f59e0b;
     border: 2px solid var(--color-surface);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
   }
 
   /* ── Copy ───────────────────────────────────────────────────── */
   .cl-copy {
     display: grid;
-    gap: 0.125rem;
+    gap: 0.2rem;
     min-inline-size: 0;
   }
 
@@ -431,19 +446,20 @@
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--color-text);
-    line-height: 1.25;
+    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: -0.01em;
   }
 
   .cl-status {
     font-family: var(--font-sans);
     font-size: 0.6875rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--color-muted);
+    color: var(--color-subtle);
     line-height: 1.25;
   }
 
@@ -460,32 +476,34 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.25rem;
-    min-inline-size: 5rem;
+    gap: 0.375rem;
+    flex-shrink: 0;
   }
 
   .cl-last-seen {
     font-family: var(--font-sans);
-    font-size: 0.75rem;
-    color: var(--color-muted);
+    font-size: 0.6875rem;
+    color: var(--color-subtle);
     white-space: nowrap;
+    font-weight: 500;
   }
 
-  /* Call button — hidden by default, revealed on hover */
+  /* Call button — revealed on hover/selected */
   .cl-call-btn {
     display: grid;
     place-items: center;
-    inline-size: 2.25rem;
-    block-size: 2.25rem;
+    inline-size: 2rem;
+    block-size: 2rem;
     border-radius: 999px;
     border: none;
-    background: color-mix(in srgb, var(--color-secondary) 14%, transparent);
-    color: var(--color-secondary);
+    background: var(--color-secondary);
+    color: #ffffff;
     cursor: pointer;
     padding: 0;
     opacity: 0;
     pointer-events: none;
-    transition: background-color 140ms ease, opacity 140ms ease;
+    transition: background-color 140ms ease, opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-secondary) 35%, transparent);
   }
 
   .cl-row:hover .cl-call-btn,
@@ -495,7 +513,13 @@
   }
 
   .cl-call-btn:hover {
-    background: color-mix(in srgb, var(--color-secondary) 24%, transparent);
+    background: var(--color-secondary-hover);
+    transform: scale(1.08);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--color-secondary) 45%, transparent);
+  }
+
+  .cl-call-btn:active {
+    transform: scale(0.95);
   }
 
   .cl-call-btn:focus-visible {
@@ -510,10 +534,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
-    padding: var(--space-xl) var(--space-lg);
+    gap: 0.625rem;
+    padding: 2.5rem 1.5rem;
     text-align: center;
     color: var(--color-muted);
+  }
+
+  .cl-empty svg {
+    opacity: 0.45;
   }
 
   .cl-empty-title {
@@ -529,13 +557,14 @@
     font-family: var(--font-sans);
     font-size: 0.8125rem;
     color: var(--color-muted);
-    max-inline-size: 20rem;
+    max-inline-size: 18rem;
+    line-height: 1.5;
   }
 
   .cl-retry-btn {
-    margin-block-start: var(--space-sm);
+    margin-block-start: 0.5rem;
     padding: 0.5rem 1.25rem;
-    border: 1px solid var(--color-border-strong);
+    border: 1.5px solid var(--color-border-strong);
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--color-text);
@@ -543,11 +572,12 @@
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 140ms ease;
+    transition: background-color 140ms ease, border-color 140ms ease;
   }
 
   .cl-retry-btn:hover {
     background: var(--color-surface-raised);
+    border-color: var(--color-secondary);
   }
 
   .cl-retry-btn:focus-visible {

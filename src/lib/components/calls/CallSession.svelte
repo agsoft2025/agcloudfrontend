@@ -1,9 +1,9 @@
 <script lang="ts" context="module">
-  import type { CallType } from '$lib/api/calls.api';
+  import type { CallType } from "$lib/api/calls.api";
 
   export interface ActiveCallSession {
     callId: string | null;
-    callMode: 'one-to-one' | 'conference';
+    callMode: "one-to-one" | "conference";
     callType: CallType;
     recipients: string[];
     initiatedAt: Date;
@@ -12,19 +12,24 @@
 </script>
 
 <script lang="ts">
-  import { ConnectionQuality, ConnectionState, Track, VideoQuality } from 'livekit-client';
-  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
-  import { callStore } from '$lib/stores/call.store';
-  import { liveKitClient } from '$lib/livekit/LiveKitClient';
-  import { getContacts } from '$lib/api/contacts.api';
-  import { addParticipant, getCallApiErrorMessage } from '$lib/api/calls.api';
-  import { authStore } from '$lib/stores/auth.store';
-  import { callLifecycleEvents } from '$lib/realtime/call-signaling';
-  import type { UserProfile } from '$lib/stores/user.store';
-  import LiveKitTrack from './LiveKitTrack.svelte';
-  import ParticipantTile from './ParticipantTile.svelte';
-  import RoomIdChip from './RoomIdChip.svelte';
+  import {
+    ConnectionQuality,
+    ConnectionState,
+    Track,
+    VideoQuality,
+  } from "livekit-client";
+  import { createEventDispatcher, onDestroy, onMount } from "svelte";
+  import { fade, scale } from "svelte/transition";
+  import { callStore } from "$lib/stores/call.store";
+  import { liveKitClient } from "$lib/livekit/LiveKitClient";
+  import { getContacts } from "$lib/api/contacts.api";
+  import { addParticipant, getCallApiErrorMessage } from "$lib/api/calls.api";
+  import { authStore } from "$lib/stores/auth.store";
+  import { callLifecycleEvents } from "$lib/realtime/call-signaling";
+  import type { UserProfile } from "$lib/stores/user.store";
+  import LiveKitTrack from "./LiveKitTrack.svelte";
+  import ParticipantTile from "./ParticipantTile.svelte";
+  import RoomIdChip from "./RoomIdChip.svelte";
 
   export let session: ActiveCallSession;
   export let isEndingCall = false;
@@ -45,12 +50,18 @@
   // ── Full screen state ───────────────────────────────
   let isFullscreen = false;
 
-  function mapNetworkQuality(q: ConnectionQuality | undefined): 'excellent' | 'good' | 'poor' | undefined {
+  function mapNetworkQuality(
+    q: ConnectionQuality | undefined,
+  ): "excellent" | "good" | "poor" | undefined {
     switch (q) {
-      case ConnectionQuality.Excellent: return 'excellent';
-      case ConnectionQuality.Good: return 'good';
-      case ConnectionQuality.Poor: return 'poor';
-      default: return undefined;
+      case ConnectionQuality.Excellent:
+        return "excellent";
+      case ConnectionQuality.Good:
+        return "good";
+      case ConnectionQuality.Poor:
+        return "poor";
+      default:
+        return undefined;
     }
   }
 
@@ -61,12 +72,13 @@
   async function toggleScreenShare() {
     if (isTogglingScreenShare || !isConnected) return;
     isTogglingScreenShare = true;
-    controlError = '';
+    controlError = "";
     try {
       await liveKitClient.setScreenShareEnabled(!isScreenSharing);
       if ($callStore.room) callStore.syncRoom($callStore.room);
     } catch (e) {
-      controlError = e instanceof Error ? e.message : 'Unable to toggle screen share.';
+      controlError =
+        e instanceof Error ? e.message : "Unable to toggle screen share.";
     } finally {
       isTogglingScreenShare = false;
     }
@@ -80,9 +92,11 @@
     const room = $callStore.room;
     if (room) {
       const payload = new TextEncoder().encode(
-        JSON.stringify({ type: 'raise-hand', raised: isHandRaisedLocal })
+        JSON.stringify({ type: "raise-hand", raised: isHandRaisedLocal }),
       );
-      room.localParticipant.publishData(payload, { reliable: true }).catch(() => undefined);
+      room.localParticipant
+        .publishData(payload, { reliable: true })
+        .catch(() => undefined);
     }
   }
 
@@ -106,27 +120,27 @@
   let showAddPeople = false;
   let contacts: UserProfile[] = [];
   let contactsLoading = false;
-  let contactsError = '';
-  let contactSearch = '';
+  let contactsError = "";
+  let contactSearch = "";
   let addingUserId: string | null = null;
-  let addPeopleError = '';
+  let addPeopleError = "";
   // Per-user invite status shown in the Add people panel.
   // 'inviting'  — API call in flight
   // 'invited'   — invite sent, awaiting response
   // 'rejected'  — person declined (shown briefly, then resets to allow re-invite)
-  let inviteStatuses = new Map<string, 'inviting' | 'invited' | 'rejected'>();
+  let inviteStatuses = new Map<string, "inviting" | "invited" | "rejected">();
   let rejectionResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // ── Video quality profile ─────────────────────────
-  type VideoQualityProfile = 'auto' | 'data-saver' | 'hd' | 'fhd';
-  let videoQualityProfile: VideoQualityProfile = 'hd';
+  type VideoQualityProfile = "auto" | "data-saver" | "hd" | "fhd";
+  let videoQualityProfile: VideoQualityProfile = "hd";
   let showQualityMenu = false;
 
   const QUALITY_LABELS: Record<VideoQualityProfile, string> = {
-    'auto':       'Auto',
-    'data-saver': 'Data Saver',
-    'hd':         'HD 720p',
-    'fhd':        'Full HD 1080p'
+    auto: "Auto",
+    "data-saver": "Data Saver",
+    hd: "HD 720p",
+    fhd: "Full HD 1080p",
   };
 
   function applyVideoQualityProfile(profile: VideoQualityProfile) {
@@ -138,22 +152,22 @@
       p.trackPublications.forEach((pub) => {
         if (pub.kind !== Track.Kind.Video) return;
         switch (profile) {
-          case 'auto':
+          case "auto":
             pub.setVideoQuality(VideoQuality.HIGH);
             pub.setVideoDimensions({ width: 1280, height: 720 });
             pub.setVideoFPS(30);
             break;
-          case 'data-saver':
+          case "data-saver":
             pub.setVideoQuality(VideoQuality.LOW);
             pub.setVideoDimensions({ width: 320, height: 240 });
             pub.setVideoFPS(15);
             break;
-          case 'hd':
+          case "hd":
             pub.setVideoQuality(VideoQuality.HIGH);
             pub.setVideoDimensions({ width: 1280, height: 720 });
             pub.setVideoFPS(30);
             break;
-          case 'fhd':
+          case "fhd":
             pub.setVideoQuality(VideoQuality.HIGH);
             pub.setVideoDimensions({ width: 1920, height: 1080 });
             pub.setVideoFPS(30);
@@ -173,7 +187,7 @@
   // ── Media toggle state ─────────────────────────────
   let isTogglingAudio = false;
   let isTogglingVideo = false;
-  let controlError = '';
+  let controlError = "";
 
   // ── Elapsed call timer ─────────────────────────────
   let elapsedSeconds = 0;
@@ -182,15 +196,17 @@
   onMount(() => {
     elapsedSeconds = 0;
     elapsedTimer = setInterval(() => {
-      elapsedSeconds = Math.floor((Date.now() - session.initiatedAt.getTime()) / 1000);
+      elapsedSeconds = Math.floor(
+        (Date.now() - session.initiatedAt.getTime()) / 1000,
+      );
     }, 1000);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
   });
 
   onDestroy(() => {
     if (isRecordingCall) stopRecordingMedia();
     if (elapsedTimer) clearInterval(elapsedTimer);
-    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener("fullscreenchange", handleFullscreenChange);
     unsubscribeCallEvents();
     rejectionResetTimers.forEach((t) => clearTimeout(t));
   });
@@ -200,51 +216,69 @@
     recordedChunks = [];
     const tracksToRecord: MediaStreamTrack[] = [];
     const localAudioTrack = $callStore.localParticipant?.tracks.find(
-      (item) => item.kind === Track.Kind.Audio && item.track
+      (item) => item.kind === Track.Kind.Audio && item.track,
     )?.track?.mediaStreamTrack;
     if (localAudioTrack) tracksToRecord.push(localAudioTrack);
-    if (localVideoTrack?.mediaStreamTrack) tracksToRecord.push(localVideoTrack.mediaStreamTrack);
+    if (localVideoTrack?.mediaStreamTrack)
+      tracksToRecord.push(localVideoTrack.mediaStreamTrack);
     $callStore.remoteParticipants.forEach((p) => {
       p.tracks.forEach((pub) => {
-        if (pub.track?.mediaStreamTrack) tracksToRecord.push(pub.track.mediaStreamTrack);
+        if (pub.track?.mediaStreamTrack)
+          tracksToRecord.push(pub.track.mediaStreamTrack);
       });
     });
-    if (tracksToRecord.length === 0) { alert('No active media tracks found to record.'); return; }
+    if (tracksToRecord.length === 0) {
+      alert("No active media tracks found to record.");
+      return;
+    }
     const stream = new MediaStream(tracksToRecord);
     try {
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+      mediaRecorder = new MediaRecorder(stream, {
+        mimeType: "video/webm;codecs=vp8,opus",
+      });
     } catch {
       mediaRecorder = new MediaRecorder(stream);
     }
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
     mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
+      const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
-      a.download = `agcloud-call-${session.callId ?? 'session'}-${Date.now()}.webm`;
+      a.download = `agcloud-call-${session.callId ?? "session"}-${Date.now()}.webm`;
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
     };
     mediaRecorder.start();
     isRecordingCall = true;
     recordingTime = 0;
-    recordingInterval = setInterval(() => { recordingTime += 1; }, 1000);
+    recordingInterval = setInterval(() => {
+      recordingTime += 1;
+    }, 1000);
     if (session.callId) {
-      import('$lib/api/calls.api').then(({ startRecording }) => {
+      import("$lib/api/calls.api").then(({ startRecording }) => {
         startRecording(session.callId!).catch(console.error);
       });
     }
   }
 
   function stopRecordingMedia() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (mediaRecorder && mediaRecorder.state !== "inactive")
+      mediaRecorder.stop();
     isRecordingCall = false;
-    if (recordingInterval) { clearInterval(recordingInterval); recordingInterval = null; }
+    if (recordingInterval) {
+      clearInterval(recordingInterval);
+      recordingInterval = null;
+    }
     if (session.callId) {
-      import('$lib/api/calls.api').then(({ stopRecording }) => {
+      import("$lib/api/calls.api").then(({ stopRecording }) => {
         stopRecording(session.callId!).catch(console.error);
       });
     }
@@ -254,38 +288,47 @@
   function formatTime(s: number): string {
     const m = Math.floor(s / 60);
     const sec = s % 60;
-    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   }
 
   function formatElapsed(s: number): string {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    if (h > 0)
+      return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   }
 
-  function getMediaControlError(error: unknown, device: 'microphone' | 'camera') {
+  function getMediaControlError(
+    error: unknown,
+    device: "microphone" | "camera",
+  ) {
     if (error instanceof DOMException) {
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')
+      if (
+        error.name === "NotAllowedError" ||
+        error.name === "PermissionDeniedError"
+      )
         return `${device.charAt(0).toUpperCase() + device.slice(1)} permission denied. Allow access in browser settings.`;
-      if (error.name === 'NotFoundError') return `No ${device} found.`;
-      if (error.name === 'NotReadableError' || error.name === 'AbortError')
+      if (error.name === "NotFoundError") return `No ${device} found.`;
+      if (error.name === "NotReadableError" || error.name === "AbortError")
         return `${device.charAt(0).toUpperCase() + device.slice(1)} is already in use.`;
     }
-    return error instanceof Error ? error.message : `Unable to update ${device}.`;
+    return error instanceof Error
+      ? error.message
+      : `Unable to update ${device}.`;
   }
 
   // ── Media toggles ──────────────────────────────────
   async function toggleMicrophone() {
     if (isTogglingAudio || !isConnected) return;
     isTogglingAudio = true;
-    controlError = '';
+    controlError = "";
     try {
       await liveKitClient.setMicrophoneEnabled(!isMicrophoneEnabled);
       if ($callStore.room) callStore.syncRoom($callStore.room);
     } catch (e) {
-      controlError = getMediaControlError(e, 'microphone');
+      controlError = getMediaControlError(e, "microphone");
     } finally {
       isTogglingAudio = false;
     }
@@ -294,14 +337,14 @@
   async function toggleCamera() {
     if (isTogglingVideo || !isConnected) return;
     isTogglingVideo = true;
-    controlError = '';
+    controlError = "";
     try {
       const pub = await liveKitClient.setCameraEnabled(!isCameraEnabled);
       if (!pub && !isCameraEnabled)
-        controlError = 'Camera unavailable. Check browser permissions.';
+        controlError = "Camera unavailable. Check browser permissions.";
       if ($callStore.room) callStore.syncRoom($callStore.room);
     } catch (e) {
-      controlError = getMediaControlError(e, 'camera');
+      controlError = getMediaControlError(e, "camera");
     } finally {
       isTogglingVideo = false;
     }
@@ -309,39 +352,58 @@
 
   // ── Reactive state ─────────────────────────────────
   $: localVideoTrack = $callStore.localParticipant?.tracks.find(
-    (t) => t.kind === Track.Kind.Video && t.track && !t.isMuted
+    (t) => t.kind === Track.Kind.Video && t.track && !t.isMuted,
   )?.track;
   $: localAudioPublication = $callStore.localParticipant?.tracks.find(
-    (t) => t.kind === Track.Kind.Audio && t.source === Track.Source.Microphone
+    (t) => t.kind === Track.Kind.Audio && t.source === Track.Source.Microphone,
   );
   $: localVideoPublication = $callStore.localParticipant?.tracks.find(
-    (t) => t.kind === Track.Kind.Video && t.source === Track.Source.Camera
+    (t) => t.kind === Track.Kind.Video && t.source === Track.Source.Camera,
   );
-  $: isMicrophoneEnabled = Boolean(localAudioPublication && !localAudioPublication.isMuted);
-  $: isCameraEnabled = Boolean(localVideoPublication && !localVideoPublication.isMuted && localVideoPublication.track);
+  $: isMicrophoneEnabled = Boolean(
+    localAudioPublication && !localAudioPublication.isMuted,
+  );
+  $: isCameraEnabled = Boolean(
+    localVideoPublication &&
+      !localVideoPublication.isMuted &&
+      localVideoPublication.track,
+  );
   $: isLocalSpeaking = Boolean($callStore.localParticipant?.isSpeaking);
 
   // Remote audio (for playback — rendered as hidden audio elements)
   $: remoteAudioTracks = $callStore.remoteParticipants.flatMap((p) =>
     p.tracks
       .filter((t) => t.kind === Track.Kind.Audio && t.track)
-      .map((t) => ({ id: t.sid, participant: p.name ?? p.identity, track: t.track }))
+      .map((t) => ({
+        id: t.sid,
+        participant: p.name ?? p.identity,
+        track: t.track,
+      })),
   );
 
   // Remote participant tiles
   $: remoteTiles = $callStore.remoteParticipants.map((p) => {
     const name = p.name ?? p.identity;
     const videoTrack = p.tracks.find(
-      (t) => t.kind === Track.Kind.Video && t.track && !t.isMuted && t.source === Track.Source.Camera
+      (t) =>
+        t.kind === Track.Kind.Video &&
+        t.track &&
+        !t.isMuted &&
+        t.source === Track.Source.Camera,
     )?.track;
     const videoPublication = p.tracks.find(
-      (t) => t.kind === Track.Kind.Video && t.source === Track.Source.Camera
+      (t) => t.kind === Track.Kind.Video && t.source === Track.Source.Camera,
     );
     const audioPublication = p.tracks.find(
-      (t) => t.kind === Track.Kind.Audio && t.source === Track.Source.Microphone
+      (t) =>
+        t.kind === Track.Kind.Audio && t.source === Track.Source.Microphone,
     );
     const screenSharePublication = p.tracks.find(
-      (t) => t.kind === Track.Kind.Video && t.source === Track.Source.ScreenShare && t.track && !t.isMuted
+      (t) =>
+        t.kind === Track.Kind.Video &&
+        t.source === Track.Source.ScreenShare &&
+        t.track &&
+        !t.isMuted,
     );
     return {
       id: p.sid || p.identity,
@@ -349,31 +411,42 @@
       videoTrack,
       screenShareTrack: screenSharePublication?.track,
       isMuted: Boolean(audioPublication?.isMuted),
-      isCameraOff: !videoPublication || videoPublication.isMuted || !videoPublication.track,
+      isCameraOff:
+        !videoPublication ||
+        videoPublication.isMuted ||
+        !videoPublication.track,
       isActive: $callStore.activeSpeakers.includes(p.identity),
       isLocal: false,
       networkQuality: mapNetworkQuality(p.connectionQuality),
-      isHandRaised: $callStore.raisedHands.includes(p.identity)
+      isHandRaised: $callStore.raisedHands.includes(p.identity),
     };
   });
 
   // Local participant tile
   $: localScreenShareTrack = $callStore.localParticipant?.tracks.find(
-    (t) => t.kind === Track.Kind.Video && t.source === Track.Source.ScreenShare && t.track && !t.isMuted
+    (t) =>
+      t.kind === Track.Kind.Video &&
+      t.source === Track.Source.ScreenShare &&
+      t.track &&
+      !t.isMuted,
   )?.track;
 
-  $: localTile = $callStore.localParticipant ? {
-    id: 'local',
-    name: 'You',
-    videoTrack: localVideoTrack,
-    screenShareTrack: localScreenShareTrack,
-    isMuted: !isMicrophoneEnabled,
-    isCameraOff: !isCameraEnabled,
-    isActive: isLocalSpeaking,
-    isLocal: true,
-    networkQuality: mapNetworkQuality($callStore.localParticipant.connectionQuality),
-    isHandRaised: isHandRaisedLocal
-  } : null;
+  $: localTile = $callStore.localParticipant
+    ? {
+        id: "local",
+        name: "You",
+        videoTrack: localVideoTrack,
+        screenShareTrack: localScreenShareTrack,
+        isMuted: !isMicrophoneEnabled,
+        isCameraOff: !isCameraEnabled,
+        isActive: isLocalSpeaking,
+        isLocal: true,
+        networkQuality: mapNetworkQuality(
+          $callStore.localParticipant.connectionQuality,
+        ),
+        isHandRaised: isHandRaisedLocal,
+      }
+    : null;
 
   $: allTiles = localTile ? [localTile, ...remoteTiles] : remoteTiles;
 
@@ -386,62 +459,79 @@
   }
 
   $: pinnedTile = pinnedId
-    ? allTiles.find((t) => t.id === pinnedId) ?? null
+    ? (allTiles.find((t) => t.id === pinnedId) ?? null)
     : screenShareTile;
 
   $: isSpotlight = Boolean(pinnedTile);
   $: mainIsScreenShare = Boolean(pinnedTile?.screenShareTrack);
-  $: mainTrack = mainIsScreenShare ? pinnedTile?.screenShareTrack : pinnedTile?.videoTrack;
-  $: thumbnailTiles = pinnedTile ? allTiles.filter((t) => t.id !== pinnedTile.id) : [];
+  $: mainTrack = mainIsScreenShare
+    ? pinnedTile?.screenShareTrack
+    : pinnedTile?.videoTrack;
+  $: thumbnailTiles = pinnedTile
+    ? allTiles.filter((t) => t.id !== pinnedTile.id)
+    : [];
 
   $: isScreenSharing = Boolean(localScreenShareTrack);
 
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
   $: totalParticipants = allTiles.length;
   $: gridCols =
-    totalParticipants <= 1 ? 1 :
-    totalParticipants <= 2 ? 2 :
-    totalParticipants <= 4 ? 2 :
-    totalParticipants <= 9 ? 3 : 4;
+    totalParticipants <= 1
+      ? 1
+      : totalParticipants <= 2
+        ? 2
+        : totalParticipants <= 4
+          ? 2
+          : totalParticipants <= 9
+            ? 3
+            : 4;
   $: gridRows = Math.ceil(totalParticipants / gridCols);
   // True when the last tile occupies a row by itself (e.g. 3 tiles in 2 cols)
-  $: lastTileAlone = totalParticipants > 1 && totalParticipants % gridCols !== 0;
-  $: roomDisplayId = session.roomName ?? session.callId ?? 'N/A';
+  $: lastTileAlone =
+    totalParticipants > 1 && totalParticipants % gridCols !== 0;
+  $: roomDisplayId = session.roomName ?? session.callId ?? "N/A";
 
   // ── Add people ──────────────────────────────────────
-  $: existingParticipantIds = new Set([
-    $authStore.user?.id,
-    $callStore.localParticipant?.identity,
-    ...$callStore.remoteParticipants.map((p) => p.identity)
-  ].filter((id): id is string => Boolean(id)));
+  $: existingParticipantIds = new Set(
+    [
+      $authStore.user?.id,
+      $callStore.localParticipant?.identity,
+      ...$callStore.remoteParticipants.map((p) => p.identity),
+    ].filter((id): id is string => Boolean(id)),
+  );
 
   $: filteredContacts = contacts.filter((c) => {
     if (!c.id || existingParticipantIds.has(c.id)) return false;
     // Hide contacts who have been successfully invited and haven't rejected yet
     const status = inviteStatuses.get(c.id);
-    if (status === 'invited' || status === 'inviting') return false;
+    if (status === "invited" || status === "inviting") return false;
     if (!contactSearch.trim()) return true;
     const q = contactSearch.trim().toLowerCase();
-    return (c.displayName ?? '').toLowerCase().includes(q) || (c.email ?? '').toLowerCase().includes(q);
+    return (
+      (c.displayName ?? "").toLowerCase().includes(q) ||
+      (c.email ?? "").toLowerCase().includes(q)
+    );
   });
 
   // Contacts currently showing "Invite Sent" or "Rejected" banners above the list
   $: pendingContacts = contacts.filter((c) => {
     if (!c.id) return false;
     const status = inviteStatuses.get(c.id);
-    return status === 'invited' || status === 'inviting' || status === 'rejected';
+    return (
+      status === "invited" || status === "inviting" || status === "rejected"
+    );
   });
 
   async function openAddPeople() {
     showAddPeople = true;
-    addPeopleError = '';
+    addPeopleError = "";
     if (contacts.length === 0 && !contactsLoading) {
       contactsLoading = true;
-      contactsError = '';
+      contactsError = "";
       try {
         contacts = await getContacts();
       } catch (e) {
-        contactsError = getCallApiErrorMessage(e, 'Unable to load contacts.');
+        contactsError = getCallApiErrorMessage(e, "Unable to load contacts.");
       } finally {
         contactsLoading = false;
       }
@@ -455,15 +545,18 @@
   async function handleAddParticipant(userId: string) {
     if (!session.callId || addingUserId) return;
     addingUserId = userId;
-    addPeopleError = '';
-    inviteStatuses = new Map(inviteStatuses).set(userId, 'inviting');
+    addPeopleError = "";
+    inviteStatuses = new Map(inviteStatuses).set(userId, "inviting");
     try {
       await addParticipant(session.callId, userId);
-      inviteStatuses = new Map(inviteStatuses).set(userId, 'invited');
+      inviteStatuses = new Map(inviteStatuses).set(userId, "invited");
     } catch (e) {
       inviteStatuses.delete(userId);
       inviteStatuses = new Map(inviteStatuses);
-      addPeopleError = getCallApiErrorMessage(e, 'Unable to add this person to the call.');
+      addPeopleError = getCallApiErrorMessage(
+        e,
+        "Unable to add this person to the call.",
+      );
     } finally {
       addingUserId = null;
     }
@@ -471,13 +564,14 @@
 
   // Watch for rejections so we can update the button state in real time.
   const unsubscribeCallEvents = callLifecycleEvents.subscribe((event) => {
-    if (!event || event.type !== 'call:participant-rejected' || !event.userId) return;
+    if (!event || event.type !== "call:participant-rejected" || !event.userId)
+      return;
     const uid = event.userId;
     // Clear any existing reset timer for this user.
     const existing = rejectionResetTimers.get(uid);
     if (existing) clearTimeout(existing);
     // Show "Rejected" briefly, then reset to "Add" so they can be re-invited.
-    inviteStatuses = new Map(inviteStatuses).set(uid, 'rejected');
+    inviteStatuses = new Map(inviteStatuses).set(uid, "rejected");
     const timer = setTimeout(() => {
       inviteStatuses.delete(uid);
       inviteStatuses = new Map(inviteStatuses);
@@ -488,8 +582,12 @@
 </script>
 
 <!-- Full-screen meeting room overlay -->
-<div class="meeting-room" class:is-fullscreen={isFullscreen} aria-label="Meeting room" bind:this={meetingRoomEl}>
-
+<div
+  class="meeting-room"
+  class:is-fullscreen={isFullscreen}
+  aria-label="Meeting room"
+  bind:this={meetingRoomEl}
+>
   <!-- Hidden audio tracks -->
   <div class="audio-sink" aria-hidden="true">
     {#each remoteAudioTracks as item (item.id)}
@@ -504,12 +602,26 @@
       <div class="header-title">
         <span class="call-type-icon" aria-hidden="true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <path d="M15 10l5-3v10l-5-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <rect x="2" y="6" width="11" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path
+              d="M15 10l5-3v10l-5-3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <rect
+              x="2"
+              y="6"
+              width="11"
+              height="12"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="2"
+            />
           </svg>
         </span>
         <span class="connection-badge" class:connected={isConnected}>
-          {isConnected ? 'Connected' : $callStore.connectionState}
+          {isConnected ? "Connected" : $callStore.connectionState}
         </span>
       </div>
     </div>
@@ -521,26 +633,79 @@
     <div class="header-right">
       <!-- Elapsed time -->
       <div class="elapsed-time" aria-label="Call duration">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle
+            cx="8"
+            cy="8"
+            r="6.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+          />
+          <path
+            d="M8 5v3l2 2"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
         {formatElapsed(elapsedSeconds)}
       </div>
       <!-- Participant count -->
-      <div class="participant-count" aria-label="{totalParticipants} participants">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <circle cx="6" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M1 14a5 5 0 0110 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <circle cx="12" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M13.5 14a3 3 0 012 2.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      <div
+        class="participant-count"
+        aria-label="{totalParticipants} participants"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle
+            cx="6"
+            cy="5"
+            r="2.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+          />
+          <path
+            d="M1 14a5 5 0 0110 0"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+          <circle
+            cx="12"
+            cy="5"
+            r="2"
+            stroke="currentColor"
+            stroke-width="1.3"
+          />
+          <path
+            d="M13.5 14a3 3 0 012 2.8"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"
+          />
         </svg>
         {totalParticipants}
       </div>
 
       <!-- Recording badge -->
       {#if isRecordingCall}
-        <div class="rec-badge" aria-live="polite" title="Recording: {formatTime(recordingTime)}">
+        <div
+          class="rec-badge"
+          aria-live="polite"
+          title="Recording: {formatTime(recordingTime)}"
+        >
           <span class="rec-dot" aria-hidden="true"></span>
           <span>REC {formatTime(recordingTime)}</span>
         </div>
@@ -549,7 +714,11 @@
   </header>
 
   <!-- ── Video stage ─────────────────────────────── -->
-  <main class="video-stage" aria-label="Participants" class:is-spotlight={isSpotlight}>
+  <main
+    class="video-stage"
+    aria-label="Participants"
+    class:is-spotlight={isSpotlight}
+  >
     {#if isSpotlight && pinnedTile}
       <!-- ── Spotlight layout: main tile + thumbnail strip ── -->
       <div class="spotlight-layout">
@@ -557,7 +726,9 @@
           <ParticipantTile
             track={mainTrack}
             name={pinnedTile.name}
-            label="{pinnedTile.name} {mainIsScreenShare ? 'screen share' : 'video'}"
+            label="{pinnedTile.name} {mainIsScreenShare
+              ? 'screen share'
+              : 'video'}"
             isActive={pinnedTile.isActive}
             isMuted={pinnedTile.isMuted}
             isCameraOff={mainIsScreenShare ? false : pinnedTile.isCameraOff}
@@ -574,7 +745,11 @@
         {#if thumbnailTiles.length > 0}
           <div class="thumbnail-strip" aria-label="Other participants">
             {#each thumbnailTiles as tile (tile.id)}
-              <div class="thumbnail-item" in:scale={{ duration: 200, start: 0.85 }} out:fade={{ duration: 150 }}>
+              <div
+                class="thumbnail-item"
+                in:scale={{ duration: 200, start: 0.85 }}
+                out:fade={{ duration: 150 }}
+              >
                 <ParticipantTile
                   track={tile.videoTrack}
                   name={tile.name}
@@ -599,12 +774,15 @@
       <div
         class="participants-grid"
         style="--cols: {gridCols}; --rows: {gridRows}"
-        aria-label="{totalParticipants} participant{totalParticipants !== 1 ? 's' : ''}"
+        aria-label="{totalParticipants} participant{totalParticipants !== 1
+          ? 's'
+          : ''}"
       >
         {#each allTiles as tile, i (tile.id)}
           <div
             class="grid-item"
-            class:grid-item--center-last={lastTileAlone && i === allTiles.length - 1}
+            class:grid-item--center-last={lastTileAlone &&
+              i === allTiles.length - 1}
             in:scale={{ duration: 220, start: 0.9 }}
             out:fade={{ duration: 150 }}
           >
@@ -636,7 +814,7 @@
           </div>
           <p class="waiting-label">Waiting for others to join</p>
           <p class="waiting-hint">
-            Share the room ID with {session.recipients.join(', ')} to invite them
+            Share the room ID with {session.recipients.join(", ")} to invite them
           </p>
         </div>
       </div>
@@ -646,13 +824,28 @@
   <!-- Control error (above controls bar) -->
   {#if controlError}
     <div class="control-error" role="alert">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="8" cy="11" r="0.75" fill="currentColor"/>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" />
+        <path
+          d="M8 5v3.5"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+        <circle cx="8" cy="11" r="0.75" fill="currentColor" />
       </svg>
       {controlError}
-      <button type="button" class="error-dismiss" on:click={() => (controlError = '')}>✕</button>
+      <button
+        type="button"
+        class="error-dismiss"
+        on:click={() => (controlError = "")}>✕</button
+      >
     </div>
   {/if}
 
@@ -667,23 +860,55 @@
         class:ctrl-off={!isMicrophoneEnabled}
         disabled={!isConnected || isTogglingAudio}
         aria-pressed={!isMicrophoneEnabled}
-        aria-label={isMicrophoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
-        title={isMicrophoneEnabled ? 'Mute' : 'Unmute'}
+        aria-label={isMicrophoneEnabled
+          ? "Mute microphone"
+          : "Unmute microphone"}
+        title={isMicrophoneEnabled ? "Mute" : "Unmute"}
         on:click={toggleMicrophone}
       >
         {#if isMicrophoneEnabled}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M19 10a7 7 0 01-14 0M12 19v3M8 22h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path
+              d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M19 10a7 7 0 01-14 0M12 19v3M8 22h8"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         {:else}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v3M8 22h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line
+              x1="1"
+              y1="1"
+              x2="23"
+              y2="23"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v3M8 22h8"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         {/if}
-        <span>{isMicrophoneEnabled ? 'Mute' : 'Unmute'}</span>
+        <span>{isMicrophoneEnabled ? "Mute" : "Unmute"}</span>
       </button>
 
       <!-- Camera -->
@@ -693,22 +918,50 @@
         class:ctrl-off={!isCameraEnabled}
         disabled={!isConnected || isTogglingVideo}
         aria-pressed={!isCameraEnabled}
-        aria-label={isCameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-        title={isCameraEnabled ? 'Camera off' : 'Camera on'}
+        aria-label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
+        title={isCameraEnabled ? "Camera off" : "Camera on"}
         on:click={toggleCamera}
       >
         {#if isCameraEnabled}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M15 10l5-3v10l-5-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <rect x="2" y="6" width="11" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+            <path
+              d="M15 10l5-3v10l-5-3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <rect
+              x="2"
+              y="6"
+              width="11"
+              height="12"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="2"
+            />
           </svg>
         {:else}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M10.7 6H13a2 2 0 012 2v2.3M15 14l5 3V7l-3.2 1.9M2 8a2 2 0 012-2h2M2 12v4a2 2 0 002 2h9a2 2 0 001.1-.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line
+              x1="1"
+              y1="1"
+              x2="23"
+              y2="23"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M10.7 6H13a2 2 0 012 2v2.3M15 14l5 3V7l-3.2 1.9M2 8a2 2 0 012-2h2M2 12v4a2 2 0 002 2h9a2 2 0 001.1-.3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         {/if}
-        <span>{isCameraEnabled ? 'Cam off' : 'Cam on'}</span>
+        <span>{isCameraEnabled ? "Cam off" : "Cam on"}</span>
       </button>
     </div>
 
@@ -719,10 +972,16 @@
       disabled={isEndingCall}
       aria-label="End call"
       title="End call"
-      on:click={() => dispatch('endCall')}
+      on:click={() => dispatch("endCall")}
     >
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1A19.4 19.4 0 013.1 10.8 19.8 19.8 0 012.1 2.2 2 2 0 014.1 0h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8.1 7.9a16 16 0 006 6l1.2-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0122 14.9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path
+          d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1A19.4 19.4 0 013.1 10.8 19.8 19.8 0 012.1 2.2 2 2 0 014.1 0h3a2 2 0 012 1.7c.1 1 .4 2 .7 2.9a2 2 0 01-.5 2.1L8.1 7.9a16 16 0 006 6l1.2-1.3a2 2 0 012.1-.5c.9.3 1.9.6 2.9.7A2 2 0 0122 14.9z"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </svg>
     </button>
 
@@ -735,19 +994,25 @@
         class:ctrl-active={isRecordingCall}
         disabled={!isConnected}
         aria-pressed={isRecordingCall}
-        aria-label={isRecordingCall ? 'Stop recording' : 'Start recording'}
-        title={isRecordingCall ? 'Stop recording' : 'Record'}
+        aria-label={isRecordingCall ? "Stop recording" : "Start recording"}
+        title={isRecordingCall ? "Stop recording" : "Record"}
         on:click={isRecordingCall ? stopRecordingMedia : startRecordingMedia}
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="2"
+          />
           {#if isRecordingCall}
-            <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/>
+            <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
           {:else}
-            <circle cx="12" cy="12" r="4" fill="currentColor"/>
+            <circle cx="12" cy="12" r="4" fill="currentColor" />
           {/if}
         </svg>
-        <span>{isRecordingCall ? 'Stop rec' : 'Record'}</span>
+        <span>{isRecordingCall ? "Stop rec" : "Record"}</span>
       </button>
 
       <!-- Add people -->
@@ -759,9 +1024,25 @@
         on:click={openAddPeople}
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 20a6.5 6.5 0 0114 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M18 8v6M15 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle
+            cx="9"
+            cy="8"
+            r="3.5"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <path
+            d="M2 20a6.5 6.5 0 0114 0"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+          <path
+            d="M18 8v6M15 11h6"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
         </svg>
         <span>Add</span>
       </button>
@@ -773,16 +1054,35 @@
         class:ctrl-active={isScreenSharing}
         disabled={!isConnected || isTogglingScreenShare}
         aria-pressed={isScreenSharing}
-        aria-label={isScreenSharing ? 'Stop sharing screen' : 'Share screen'}
-        title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
+        aria-label={isScreenSharing ? "Stop sharing screen" : "Share screen"}
+        title={isScreenSharing ? "Stop sharing" : "Share screen"}
         on:click={toggleScreenShare}
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-          <path d="M8 20h8M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect
+            x="2"
+            y="4"
+            width="20"
+            height="14"
+            rx="2"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <path
+            d="M8 20h8M12 18v2"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+          <path
+            d="M10 10l2-2 2 2M12 8v6"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
-        <span>{isScreenSharing ? 'Sharing' : 'Share'}</span>
+        <span>{isScreenSharing ? "Sharing" : "Share"}</span>
       </button>
 
       <!-- Raise hand -->
@@ -792,15 +1092,20 @@
         class:ctrl-active={isHandRaisedLocal}
         disabled={!isConnected}
         aria-pressed={isHandRaisedLocal}
-        aria-label={isHandRaisedLocal ? 'Lower hand' : 'Raise hand'}
-        title={isHandRaisedLocal ? 'Lower hand' : 'Raise hand'}
+        aria-label={isHandRaisedLocal ? "Lower hand" : "Raise hand"}
+        title={isHandRaisedLocal ? "Lower hand" : "Raise hand"}
         on:click={toggleRaiseHand}
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 11.5V4.5a1.5 1.5 0 013 0v6M12 10.5V3a1.5 1.5 0 013 0v7.5M15 10.5V5a1.5 1.5 0 013 0v9a6 6 0 01-6 6h-1a6 6 0 01-5-2.7L4 13.8a1.4 1.4 0 012.3-1.6L8 14"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path
+            d="M9 11.5V4.5a1.5 1.5 0 013 0v6M12 10.5V3a1.5 1.5 0 013 0v7.5M15 10.5V5a1.5 1.5 0 013 0v9a6 6 0 01-6 6h-1a6 6 0 01-5-2.7L4 13.8a1.4 1.4 0 012.3-1.6L8 14"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
-        <span>{isHandRaisedLocal ? 'Lower' : 'Raise'}</span>
+        <span>{isHandRaisedLocal ? "Lower" : "Raise"}</span>
       </button>
 
       <!-- Video quality -->
@@ -808,23 +1113,52 @@
         <button
           type="button"
           class="ctrl-btn"
-          class:ctrl-active={videoQualityProfile !== 'auto'}
+          class:ctrl-active={videoQualityProfile !== "auto"}
           aria-label="Video quality: {QUALITY_LABELS[videoQualityProfile]}"
           title="Video quality"
           on:click={() => (showQualityMenu = !showQualityMenu)}
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-            <path d="M8 12h4M14 9l2 3-2 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect
+              x="2"
+              y="5"
+              width="20"
+              height="14"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <path
+              d="M8 12h4M14 9l2 3-2 3"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
-          <span>{videoQualityProfile === 'auto' ? 'Auto' : videoQualityProfile === 'data-saver' ? 'Save' : videoQualityProfile === 'hd' ? 'HD' : 'FHD'}</span>
+          <span
+            >{videoQualityProfile === "auto"
+              ? "Auto"
+              : videoQualityProfile === "data-saver"
+                ? "Save"
+                : videoQualityProfile === "hd"
+                  ? "HD"
+                  : "FHD"}</span
+          >
         </button>
 
         {#if showQualityMenu}
           <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-          <div class="quality-backdrop" on:click={() => (showQualityMenu = false)}></div>
-          <div class="quality-menu" role="menu" aria-label="Select video quality">
-            {#each (['auto', 'data-saver', 'hd', 'fhd'] as VideoQualityProfile[]) as profile}
+          <div
+            class="quality-backdrop"
+            on:click={() => (showQualityMenu = false)}
+          ></div>
+          <div
+            class="quality-menu"
+            role="menu"
+            aria-label="Select video quality"
+          >
+            {#each ["auto", "data-saver", "hd", "fhd"] as VideoQualityProfile[] as profile}
               <button
                 type="button"
                 role="menuitem"
@@ -832,9 +1166,11 @@
                 class:quality-option--active={videoQualityProfile === profile}
                 on:click={() => applyVideoQualityProfile(profile)}
               >
-                <span class="quality-check" aria-hidden="true">{videoQualityProfile === profile ? '✓' : ''}</span>
+                <span class="quality-check" aria-hidden="true"
+                  >{videoQualityProfile === profile ? "✓" : ""}</span
+                >
                 {QUALITY_LABELS[profile]}
-                {#if profile === 'hd'}
+                {#if profile === "hd"}
                   <span class="quality-badge">Recommended</span>
                 {/if}
               </button>
@@ -849,22 +1185,32 @@
         class="ctrl-btn"
         class:ctrl-active={isFullscreen}
         aria-pressed={isFullscreen}
-        aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
-        title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+        aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+        title={isFullscreen ? "Exit full screen" : "Full screen"}
         on:click={toggleFullscreen}
       >
         {#if isFullscreen}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M9 4H5a1 1 0 00-1 1v4M15 4h4a1 1 0 011 1v4M9 20H5a1 1 0 01-1-1v-4M15 20h4a1 1 0 001-1v-4"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path
+              d="M9 4H5a1 1 0 00-1 1v4M15 4h4a1 1 0 011 1v4M9 20H5a1 1 0 01-1-1v-4M15 20h4a1 1 0 001-1v-4"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         {:else}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path
+              d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         {/if}
-        <span>{isFullscreen ? 'Exit' : 'Full'}</span>
+        <span>{isFullscreen ? "Exit" : "Full"}</span>
       </button>
     </div>
   </div>
@@ -884,7 +1230,12 @@
       <div class="add-people-card" on:click|stopPropagation>
         <header class="add-people-header">
           <h2>Add people</h2>
-          <button type="button" class="add-people-close" aria-label="Close" on:click={closeAddPeople}>✕</button>
+          <button
+            type="button"
+            class="add-people-close"
+            aria-label="Close"
+            on:click={closeAddPeople}>✕</button
+          >
         </header>
 
         <input
@@ -903,30 +1254,45 @@
           <!-- Pending rows (Invite Sent / Rejected) always shown at the top -->
           {#each pendingContacts as contact (contact.id)}
             {@const status = inviteStatuses.get(contact.id)}
-            <div class="add-people-row" class:add-people-row-rejected={status === 'rejected'}>
+            <div
+              class="add-people-row"
+              class:add-people-row-rejected={status === "rejected"}
+            >
               <div class="add-people-avatar" aria-hidden="true">
-                {#if status === 'invited'}
+                {#if status === "invited"}
                   <span>✓</span>
-                {:else if status === 'rejected'}
+                {:else if status === "rejected"}
                   <span>✕</span>
                 {:else if contact.avatarUrl}
                   <img src={contact.avatarUrl} alt="" />
                 {:else}
-                  <span>{(contact.displayName ?? contact.email ?? '?').slice(0, 1).toUpperCase()}</span>
+                  <span
+                    >{(contact.displayName ?? contact.email ?? "?")
+                      .slice(0, 1)
+                      .toUpperCase()}</span
+                  >
                 {/if}
               </div>
               <div class="add-people-name">
-                <span class="add-people-display-name">{contact.displayName ?? contact.email}</span>
+                <span class="add-people-display-name"
+                  >{contact.displayName ?? contact.email}</span
+                >
                 {#if contact.displayName}
                   <span class="add-people-email">{contact.email}</span>
                 {/if}
               </div>
-              {#if status === 'invited'}
-                <span class="add-people-status-label add-people-status-invited">Invite Sent</span>
-              {:else if status === 'rejected'}
-                <span class="add-people-status-label add-people-status-rejected">Declined</span>
+              {#if status === "invited"}
+                <span class="add-people-status-label add-people-status-invited"
+                  >Invite Sent</span
+                >
+              {:else if status === "rejected"}
+                <span class="add-people-status-label add-people-status-rejected"
+                  >Declined</span
+                >
               {:else}
-                <span class="add-people-status-label add-people-status-invited">Sending…</span>
+                <span class="add-people-status-label add-people-status-invited"
+                  >Sending…</span
+                >
               {/if}
             </div>
           {/each}
@@ -950,11 +1316,17 @@
                   {#if contact.avatarUrl}
                     <img src={contact.avatarUrl} alt="" />
                   {:else}
-                    <span>{(contact.displayName ?? contact.email ?? '?').slice(0, 1).toUpperCase()}</span>
+                    <span
+                      >{(contact.displayName ?? contact.email ?? "?")
+                        .slice(0, 1)
+                        .toUpperCase()}</span
+                    >
                   {/if}
                 </div>
                 <div class="add-people-name">
-                  <span class="add-people-display-name">{contact.displayName ?? contact.email}</span>
+                  <span class="add-people-display-name"
+                    >{contact.displayName ?? contact.email}</span
+                  >
                   {#if contact.displayName}
                     <span class="add-people-email">{contact.email}</span>
                   {/if}
@@ -962,11 +1334,11 @@
                 <button
                   type="button"
                   class="add-people-add-btn"
-                  class:add-people-add-btn--retry={status === 'rejected'}
+                  class:add-people-add-btn--retry={status === "rejected"}
                   disabled={Boolean(addingUserId)}
                   on:click={() => handleAddParticipant(contact.id)}
                 >
-                  {status === 'rejected' ? 'Add Again' : 'Add'}
+                  {status === "rejected" ? "Add Again" : "Add"}
                 </button>
               </div>
             {/each}
@@ -1046,8 +1418,11 @@
     block-size: 2rem;
     border-radius: 10px;
     color: #7ecfff;
-    background:
-      linear-gradient(135deg, rgba(126, 207, 255, 0.18), rgba(78, 135, 255, 0.08));
+    background: linear-gradient(
+      135deg,
+      rgba(126, 207, 255, 0.18),
+      rgba(78, 135, 255, 0.08)
+    );
     border: 1px solid rgba(126, 207, 255, 0.24);
   }
 
@@ -1062,7 +1437,9 @@
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    transition: color 300ms ease, background-color 300ms ease;
+    transition:
+      color 300ms ease,
+      background-color 300ms ease;
   }
 
   .connection-badge.connected {
@@ -1096,7 +1473,9 @@
     white-space: nowrap;
   }
 
-  .elapsed-time { font-family: var(--font-mono, monospace); }
+  .elapsed-time {
+    font-family: var(--font-mono, monospace);
+  }
 
   /* Recording badge */
   .rec-badge {
@@ -1123,8 +1502,13 @@
   }
 
   @keyframes rec-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.25; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.25;
+    }
   }
 
   /* ── Video stage ─────────────────────────────────── */
@@ -1155,7 +1539,7 @@
   }
 
   /* Single participant: cap width so the tile doesn't stretch too wide */
-  .participants-grid[style*='--cols: 1'] {
+  .participants-grid[style*="--cols: 1"] {
     max-inline-size: min(100%, 72rem);
     margin-inline: auto;
   }
@@ -1295,8 +1679,15 @@
   }
 
   @keyframes waiting-pulse {
-    0%, 100% { transform: scale(0.85); opacity: 0.5; }
-    50%       { transform: scale(1.1); opacity: 1; }
+    0%,
+    100% {
+      transform: scale(0.85);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
   }
 
   .waiting-label {
@@ -1339,7 +1730,9 @@
     line-height: 1;
   }
 
-  .error-dismiss:hover { color: rgba(255, 255, 255, 0.8); }
+  .error-dismiss:hover {
+    color: rgba(255, 255, 255, 0.8);
+  }
 
   /* ── Controls bar ────────────────────────────────── */
   .controls-bar {
@@ -1405,9 +1798,13 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
-  .ctrl-btn:hover:not(:disabled) span { color: rgba(255, 255, 255, 0.75); }
+  .ctrl-btn:hover:not(:disabled) span {
+    color: rgba(255, 255, 255, 0.75);
+  }
 
-  .ctrl-btn:active:not(:disabled) { transform: translateY(0); }
+  .ctrl-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
 
   .ctrl-btn:focus-visible {
     outline: 2px solid rgba(78, 135, 255, 0.7);
@@ -1484,8 +1881,14 @@
   }
 
   @keyframes quality-pop {
-    from { opacity: 0; transform: translateY(4px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .quality-option {
@@ -1503,7 +1906,9 @@
     font-weight: 500;
     cursor: pointer;
     text-align: left;
-    transition: background-color 120ms ease, color 120ms ease;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
   }
 
   .quality-option:hover {
@@ -1587,6 +1992,9 @@
     place-items: center;
     cursor: pointer;
     font-size: 0.75rem;
+    margin-bottom: 0;
+    display: flex;
+    justify-content: center;
   }
 
   .add-people-close:hover {
@@ -1741,9 +2149,14 @@
 
   /* ── Responsive ──────────────────────────────────── */
   @media (max-width: 640px) {
-    .meeting-header { padding: 0.5rem 0.75rem; }
+    .meeting-header {
+      padding: 0.5rem 0.75rem;
+    }
 
-    .header-center { order: 3; flex: 1 1 100%; }
+    .header-center {
+      order: 3;
+      flex: 1 1 100%;
+    }
 
     .meeting-header {
       flex-wrap: wrap;
@@ -1766,13 +2179,23 @@
       max-inline-size: 100%;
     }
 
-    .controls-bar { gap: 0.375rem; padding: 0.5rem 0.75rem 0.75rem; }
+    .controls-bar {
+      gap: 0.375rem;
+      padding: 0.5rem 0.75rem 0.75rem;
+    }
 
-    .ctrl-btn { min-inline-size: 3rem; padding: 0.625rem; }
+    .ctrl-btn {
+      min-inline-size: 3rem;
+      padding: 0.625rem;
+    }
 
-    .ctrl-btn span { display: none; }
+    .ctrl-btn span {
+      display: none;
+    }
 
-    .ctrl-btn.ctrl-end { min-inline-size: 3.5rem; }
+    .ctrl-btn.ctrl-end {
+      min-inline-size: 3.5rem;
+    }
 
     .waiting-overlay {
       inset-inline-end: 0.5rem;
@@ -1782,7 +2205,7 @@
 
   /* Tablet: reduce 3-col grid to 2 cols, and recompute rows on the spot */
   @media (max-width: 900px) {
-    .participants-grid[style*='--cols: 3'] {
+    .participants-grid[style*="--cols: 3"] {
       grid-template-columns: repeat(2, 1fr) !important;
     }
   }

@@ -137,6 +137,7 @@
       color 140ms ease,
       transform 120ms ease;
     line-height: 0;
+    margin-bottom: 0;
   }
 
   .copy-btn:hover {

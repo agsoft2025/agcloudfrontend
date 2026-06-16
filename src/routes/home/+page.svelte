@@ -28,11 +28,11 @@
       label: 'Contacts',
       description: 'View and call your contacts'
     },
-    {
-      id: 'calls',
-      label: 'Calls',
-      description: 'Recent and missed calls'
-    }
+    // {
+    //   id: 'calls',
+    //   label: 'Calls',
+    //   description: 'Recent and missed calls'
+    // }
   ];
 
   let selectedSection: HomeSection = 'contact';
@@ -133,7 +133,7 @@
     <div class="dashboard" aria-label="Contact dashboard">
 
       <!-- Contacts toggle button -->
-      <button
+      <!-- <button
         class="contacts-toggle"
         type="button"
         aria-label={contactsDrawerOpen ? 'Close contacts' : 'Open contacts'}
@@ -147,7 +147,7 @@
           <path d="M16 9h6M19 6v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
         </svg>
         <span>Contacts</span>
-      </button>
+      </button> -->
 
       <!-- Drawer backdrop -->
       {#if contactsDrawerOpen}
@@ -242,6 +242,7 @@
     border-block-end: 1px solid var(--color-border);
     flex-shrink: 0;
     z-index: 10;
+    box-shadow: var(--shadow-xs);
   }
 
   .hamburger {
@@ -249,7 +250,7 @@
     place-items: center;
     inline-size: 2.25rem;
     block-size: 2.25rem;
-    border: 1px solid var(--color-border);
+    border: 1.5px solid var(--color-border);
     border-radius: var(--radius-md);
     background: transparent;
     color: var(--color-text);
@@ -286,7 +287,7 @@
     object-fit: contain;
   }
 
-  /* Dashboard: detail + history, with contacts as an overlay drawer */
+  /* Dashboard: 3-column flex row */
   .dashboard {
     flex: 1;
     min-block-size: 0;
@@ -295,75 +296,16 @@
     position: relative;
   }
 
-  /* Contacts toggle button */
-  .contacts-toggle {
-    position: absolute;
-    inset-block-start: 0.75rem;
-    inset-inline-start: 0.75rem;
-    z-index: 35;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.875rem;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: var(--color-surface);
-    color: var(--color-text);
-    font-family: var(--font-sans);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
-    transition: background-color 140ms ease, border-color 140ms ease;
-  }
-
-  .contacts-toggle:hover {
-    background: var(--color-surface-raised);
-    border-color: var(--color-border-strong);
-  }
-
-  .contacts-toggle:focus-visible {
-    outline: 2px solid var(--color-secondary);
-    outline-offset: 2px;
-  }
-
-  /* Drawer backdrop */
-  .drawer-backdrop {
-    position: absolute;
-    inset: 0;
-    z-index: 29;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
-    animation: fade-in 160ms ease both;
-  }
-
-  @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  /* Contacts drawer: slides in from the left, overlays detail/history */
-  .contacts-drawer {
-    position: absolute;
-    inset-block: 0;
-    inset-inline-start: 0;
-    z-index: 30;
+  /* Column 1: Contact list */
+  .col-contacts {
     inline-size: 22rem;
-    max-inline-size: 90vw;
-    transform: translateX(-100%);
-    transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: none;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  .contacts-drawer.is-open {
-    transform: translateX(0);
-    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.35);
-  }
-
-  /* Contact detail */
+  /* Column 2: Contact detail */
   .col-detail {
     flex: 1;
     min-inline-size: 0;
@@ -372,7 +314,7 @@
     overflow: hidden;
   }
 
-  /* Recent calls */
+  /* Column 3: Recent calls */
   .col-history {
     display: flex;
     flex-direction: column;
@@ -384,22 +326,9 @@
     display: none;
   }
 
-  /* Recent calls panel: desktop shows fixed width; mobile hides by default */
-  @media (max-width: 800px) {
-    .col-hidden-mobile {
-      display: none;
-    }
-
-    .col-history.col-visible-mobile {
-      display: flex;
-      flex: 1;
-      min-block-size: 100%;
-    }
-  }
-
-  /* Tablet: slightly narrower drawer */
+  /* Tablet: slightly narrower contact list */
   @media (max-width: 1100px) {
-    .contacts-drawer {
+    .col-contacts {
       inline-size: 18rem;
     }
   }
@@ -411,11 +340,19 @@
     }
 
     .dashboard {
+      flex-direction: column;
       overflow-y: auto;
     }
 
-    .contacts-drawer {
+    .col-contacts {
       inline-size: 100%;
+      flex-shrink: 0;
+      block-size: auto;
+      min-block-size: 100%;
+    }
+
+    .col-contacts.is-hidden {
+      display: none;
     }
 
     .col-detail {
@@ -428,7 +365,7 @@
       display: flex;
       align-items: center;
       gap: 0.375rem;
-      padding: 0.5rem 1rem;
+      padding: 0.625rem 1.25rem;
       border: none;
       border-block-end: 1px solid var(--color-border);
       background: var(--color-surface);
@@ -439,6 +376,16 @@
       cursor: pointer;
       flex-shrink: 0;
       z-index: 5;
+      transition: background-color 120ms ease;
+    }
+
+    .mobile-back:hover {
+      background: var(--color-surface-raised);
+    }
+
+    .mobile-back:focus-visible {
+      outline: 2px solid var(--color-secondary);
+      outline-offset: 2px;
     }
   }
 </style>

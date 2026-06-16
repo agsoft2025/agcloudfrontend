@@ -178,7 +178,7 @@
 
 <style lang="postcss">
   .sidebar {
-    --sidebar-width: 280px;
+    --sidebar-width: 325px;
     /* Sidebar colours come from themes.css — see --sidebar-bg, --sidebar-border */
     --sidebar-transition: 260ms cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -215,9 +215,10 @@
   .sidebar-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0  .75rem;
+    justify-content: space-between;
+    gap: 0.75rem;
     flex-shrink: 0;
+    padding: 0.5rem 1rem 0;
   }
 
   .brand {
@@ -228,9 +229,9 @@
 
   .brand-logo {
     display: block;
-    block-size: 4.75rem;
+    block-size: 4.25rem;
     inline-size: auto;
-    max-inline-size: 12rem;
+    max-inline-size: 10rem;
     object-fit: contain;
   }
 
@@ -274,7 +275,7 @@
   .nav-section {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.25rem;
   }
 
   .sidebar-footer {
@@ -282,8 +283,10 @@
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
-    padding: 1rem 1rem 1.25rem;
+    padding: 0.875rem 1rem 1.125rem;
     border-block-start: 1px solid var(--sidebar-border);
+    background: color-mix(in srgb, var(--sidebar-bg) 80%, transparent);
+    backdrop-filter: blur(8px);
   }
 
   .user-card {
