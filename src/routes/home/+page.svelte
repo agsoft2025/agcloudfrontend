@@ -1,15 +1,14 @@
 <!--
-  /home -- Contact Dashboard
-  Three-column layout:
-    [HomeSidebar] [ContactList] [ContactDetail | RecentCalls]
+  /home — Contact Dashboard
+  Four-column desktop layout:
+    [HomeSidebar] [ContactList] [ContactDetail] [RecentCalls]
 
-  Desktop  : all three columns visible simultaneously
-  Tablet   : HomeSidebar + ContactList (RecentCalls hidden via CSS)
-  Mobile   : HomeSidebar slide-over + full-width ContactList or ContactDetail
-
-  Auth guard is in +layout.svelte -- no need to repeat it here.
+  Desktop  : all four columns visible simultaneously
+  Tablet   : sidebar + contacts + detail (history hidden)
+  Mobile   : stacked; back button toggles between list and detail
 -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import HomeSidebar, {
     type HomeSection,
     type HomeSidebarItem
@@ -17,45 +16,26 @@
   import ContactList from '$lib/components/home/ContactList.svelte';
   import ContactDetail from '$lib/components/home/ContactDetail.svelte';
   import RecentCalls from '$lib/components/home/RecentCalls.svelte';
-  import { initiateCall, getCallIdentifier, hasLiveKitCredentials, getCallApiErrorMessage } from '$lib/api/calls.api';
+  import {
+    initiateCall,
+    getCallIdentifier,
+    hasLiveKitCredentials,
+    getCallApiErrorMessage
+  } from '$lib/api/calls.api';
   import type { UserProfile } from '$lib/stores/user.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
 
-  // Sidebar nav
+  // Sidebar nav items
   const sidebarItems: HomeSidebarItem[] = [
-    {
-      id: 'contact',
-      label: 'Contacts',
-      description: 'View and call your contacts'
-    },
-    // {
-    //   id: 'calls',
-    //   label: 'Calls',
-    //   description: 'Recent and missed calls'
-    // }
+    { id: 'contact', label: 'Contacts', description: 'View and call your contacts' }
   ];
 
   let selectedSection: HomeSection = 'contact';
   let mobileNavOpen = false;
 
-  // Contacts drawer (slides in from the left over the detail/history view)
-  let contactsDrawerOpen = false;
-
-  function toggleContactsDrawer() {
-    contactsDrawerOpen = !contactsDrawerOpen;
-  }
-
-  function closeContactsDrawer() {
-    contactsDrawerOpen = false;
-  }
-
-  // Contact selection — both props are bound directly from ContactList
-  // so ContactDetail receives the full UserProfile without any store lookup.
+  // Contact selection — bound from ContactList
   let selectedContactId: string | null = null;
   let selectedContact: UserProfile | null = null;
-
-  // Close the contacts drawer once a contact is selected so the detail view is visible
-  $: if (selectedContactId) contactsDrawerOpen = false;
 
   // Call initiation
   async function handleCall(contact: UserProfile, callType: 'audio' | 'video') {
@@ -67,9 +47,7 @@
       });
 
       const callId = getCallIdentifier(response);
-      if (!callId) {
-        throw new Error('Call initiated but no call id was returned.');
-      }
+      if (!callId) throw new Error('Call initiated but no call id was returned.');
 
       activeCallStore.startOutgoing({
         callId,
@@ -84,6 +62,11 @@
           ? { token: response.token, roomName: response.roomName, url: response.url }
           : null
       });
+
+      // Navigate to the dedicated call page when credentials are available
+      if (hasLiveKitCredentials(response)) {
+        await goto(`/call/${encodeURIComponent(response.roomName)}`);
+      }
     } catch (err) {
       console.error('[ContactDashboard] Call initiation failed:', getCallApiErrorMessage(err));
     }
@@ -91,7 +74,7 @@
 </script>
 
 <svelte:head>
-  <title>Contact | AG Cloud</title>
+  <title>Contacts | AG Cloud</title>
   <meta name="description" content="View and call your AG Cloud contacts." />
 </svelte:head>
 
@@ -103,7 +86,7 @@
     bind:mobileOpen={mobileNavOpen}
   />
 
-  <!-- Content shell: contact list + detail/history -->
+  <!-- Content shell -->
   <div class="content-shell">
     <!-- Mobile top bar -->
     <header class="topbar" aria-label="Mobile navigation">
@@ -120,52 +103,20 @@
             stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
         </svg>
       </button>
-
       <div class="topbar-brand">
-        <img src="/logo.png" alt="AG Cloud" class="topbar-logo" />
         <span>AG Cloud</span>
       </div>
-
       <div style="inline-size: 2.25rem;" aria-hidden="true"></div>
     </header>
 
-    <!-- Dashboard area: contacts drawer + detail/history -->
+    <!-- Four-column dashboard -->
     <div class="dashboard" aria-label="Contact dashboard">
 
-      <!-- Contacts toggle button -->
-      <!-- <button
-        class="contacts-toggle"
-        type="button"
-        aria-label={contactsDrawerOpen ? 'Close contacts' : 'Open contacts'}
-        aria-expanded={contactsDrawerOpen}
-        aria-controls="contacts-drawer"
-        on:click={toggleContactsDrawer}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="9" cy="8" r="3.5" stroke="currentColor" stroke-width="1.75"/>
-          <path d="M2 20a6.5 6.5 0 0114 0" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          <path d="M16 9h6M19 6v6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        <span>Contacts</span>
-      </button> -->
-
-      <!-- Drawer backdrop -->
-      {#if contactsDrawerOpen}
-        <div
-          class="drawer-backdrop"
-          aria-hidden="true"
-          on:click={closeContactsDrawer}
-          on:keydown={(e) => e.key === 'Escape' && closeContactsDrawer()}
-        ></div>
-      {/if}
-
-      <!-- Contacts drawer (slides in from the left) -->
+      <!-- Column 1: Contact list -->
       <section
-        id="contacts-drawer"
-        class="contacts-drawer"
-        class:is-open={contactsDrawerOpen}
+        class="col-contacts"
+        class:col-hidden-mobile={!!selectedContactId}
         aria-label="Contacts"
-        aria-hidden={!contactsDrawerOpen}
       >
         <ContactList
           bind:selectedId={selectedContactId}
@@ -174,13 +125,13 @@
         />
       </section>
 
-      <!-- Mobile back button (shown when a contact is selected on mobile) -->
+      <!-- Mobile back button -->
       {#if selectedContactId}
         <button
           class="mobile-back"
           type="button"
           aria-label="Back to contacts"
-          on:click={() => (selectedContactId = null)}
+          on:click={() => { selectedContactId = null; selectedContact = null; }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"
@@ -190,10 +141,10 @@
         </button>
       {/if}
 
-      <!-- Contact detail -->
+      <!-- Column 2: Contact detail -->
       <section
         class="col-detail"
-        class:col-hidden-mobile={selectedSection === 'calls'}
+        class:col-visible-mobile={!!selectedContactId}
         aria-label="Contact details"
       >
         <ContactDetail
@@ -202,12 +153,8 @@
         />
       </section>
 
-      <!-- Recent call history -->
-      <section
-        class="col-history"
-        class:col-visible-mobile={selectedSection === 'calls'}
-        aria-label="Recent calls"
-      >
+      <!-- Column 3: Recent call history -->
+      <section class="col-history" aria-label="Recent calls">
         <RecentCalls />
       </section>
 
@@ -216,11 +163,11 @@
 </div>
 
 <style lang="postcss">
+  /* ── Root layout ─────────────────────────────────────────── */
   .app-layout {
     display: flex;
     block-size: 100dvh;
     overflow: hidden;
-    background: var(--home-layout-bg);
   }
 
   .content-shell {
@@ -231,7 +178,7 @@
     overflow: hidden;
   }
 
-  /* Mobile top bar */
+  /* ── Mobile top bar ────────────────────────────────────── */
   .topbar {
     display: none;
     align-items: center;
@@ -271,9 +218,6 @@
   }
 
   .topbar-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
     color: var(--color-primary);
     font-family: var(--font-sans);
     font-size: 0.9375rem;
@@ -281,13 +225,7 @@
     letter-spacing: -0.02em;
   }
 
-  .topbar-logo {
-    block-size: 1.75rem;
-    inline-size: auto;
-    object-fit: contain;
-  }
-
-  /* Dashboard: 3-column flex row */
+  /* ── Dashboard: 3-column flex row ─────────────────────── */
   .dashboard {
     flex: 1;
     min-block-size: 0;
@@ -296,7 +234,7 @@
     position: relative;
   }
 
-  /* Column 1: Contact list */
+  /* Column 1: Contact list — fixed width */
   .col-contacts {
     inline-size: 22rem;
     flex-shrink: 0;
@@ -305,7 +243,7 @@
     overflow: hidden;
   }
 
-  /* Column 2: Contact detail */
+  /* Column 2: Contact detail — flexible */
   .col-detail {
     flex: 1;
     min-inline-size: 0;
@@ -314,30 +252,28 @@
     overflow: hidden;
   }
 
-  /* Column 3: Recent calls */
+  /* Column 3: Recent calls — fixed width */
   .col-history {
+    inline-size: 22rem;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-inline-start: 1px solid var(--color-border);
   }
 
-  /* Mobile back button: hidden on desktop */
-  .mobile-back {
-    display: none;
+  /* Mobile back button — hidden on desktop */
+  .mobile-back { display: none; }
+
+  /* ── Tablet ─────────────────────────────────────────────── */
+  @media (max-width: 1200px) {
+    .col-contacts { inline-size: 18rem; }
+    .col-history  { display: none; }
   }
 
-  /* Tablet: slightly narrower contact list */
-  @media (max-width: 1100px) {
-    .col-contacts {
-      inline-size: 18rem;
-    }
-  }
-
-  /* Mobile */
+  /* ── Mobile ─────────────────────────────────────────────── */
   @media (max-width: 800px) {
-    .topbar {
-      display: flex;
-    }
+    .topbar { display: flex; }
 
     .dashboard {
       flex-direction: column;
@@ -351,15 +287,16 @@
       min-block-size: 100%;
     }
 
-    .col-contacts.is-hidden {
-      display: none;
-    }
+    .col-contacts.col-hidden-mobile { display: none; }
 
     .col-detail {
       flex: none;
       block-size: auto;
       min-block-size: 100%;
+      display: none;
     }
+
+    .col-detail.col-visible-mobile { display: flex; }
 
     .mobile-back {
       display: flex;
@@ -379,9 +316,7 @@
       transition: background-color 120ms ease;
     }
 
-    .mobile-back:hover {
-      background: var(--color-surface-raised);
-    }
+    .mobile-back:hover { background: var(--color-surface-raised); }
 
     .mobile-back:focus-visible {
       outline: 2px solid var(--color-secondary);
