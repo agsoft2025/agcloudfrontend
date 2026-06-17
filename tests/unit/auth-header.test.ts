@@ -1,13 +1,30 @@
-import { describe, expect, it, afterEach } from 'vitest';
-import type { AxiosAdapter, AxiosResponse } from 'axios';
-import { axiosClient } from '../../src/lib/api/client';
+import { describe, expect, it, afterEach, vi, beforeEach } from 'vitest';
+import { apiFetch } from '../../src/lib/api/client';
 import { storeAuthTokens } from '../../src/lib/api/auth.api';
 import { initiateCall } from '../../src/lib/api/calls.api';
 import { authStore } from '../../src/lib/stores/auth.store';
 
 describe('authenticated API requests', () => {
+  let capturedRequest: Request | undefined;
+
+  beforeEach(() => {
+    capturedRequest = undefined;
+    // Intercept all fetch calls so we can inspect the Authorization header
+    // without making real network requests.
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const request = input instanceof Request
+        ? new Request(input, init)
+        : new Request(input.toString(), init);
+      capturedRequest = request;
+      return new Response(JSON.stringify({ message: 'ok' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    });
+  });
+
   afterEach(() => {
-    axiosClient.defaults.adapter = undefined;
+    vi.unstubAllGlobals();
     authStore.clear();
     localStorage.clear();
   });
@@ -21,27 +38,12 @@ describe('authenticated API requests', () => {
       }
     });
 
-    let authorizationHeader: unknown;
-    const adapter: AxiosAdapter = async (config) => {
-      authorizationHeader = config.headers?.get?.('Authorization');
-
-      return {
-        data: { message: 'ok' },
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config
-      } satisfies AxiosResponse;
-    };
-
-    axiosClient.defaults.adapter = adapter;
-
     await initiateCall({
       receiverIds: ['user-2'],
       callType: 'video',
       callMode: 'one-to-one'
     });
 
-    expect(authorizationHeader).toBe('Bearer signin-token');
+    expect(capturedRequest?.headers.get('Authorization')).toBe('Bearer signin-token');
   });
 });

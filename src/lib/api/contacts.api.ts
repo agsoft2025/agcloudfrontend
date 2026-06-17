@@ -2,18 +2,14 @@
  * contacts.api.ts
  *
  * API helpers for the Contact Dashboard:
- *   - getContacts()   — list all visible users / contacts
- *   - getCallHistory()— recent call log for the current user
- *
- * Both functions use the shared axiosClient, which injects the
- * Bearer token and handles 401 → refresh automatically.
+ *   - getContacts()    — list all visible users / contacts
+ *   - getCallHistory() — recent call log for the current user
  */
-import { axiosClient } from './client';
+import { apiGet } from './client';
 import type { UserProfile } from '$lib/stores/user.store';
 
-// ── Contact list ───────────────────────────────────────────────────
+// ── Contact list ───────────────────────────────────────────────────────────────
 
-/** Server may return an array or a wrapper object. */
 interface ContactsListResponse {
   users?: UserProfile[];
   data?: UserProfile[];
@@ -24,42 +20,32 @@ export async function getContacts(search?: string): Promise<UserProfile[]> {
   const params: Record<string, string> = {};
   if (search?.trim()) params.search = search.trim();
 
-  const response = await axiosClient.get<UserProfile[] | ContactsListResponse>('/users', {
-    params,
-  });
+  const data = await apiGet<UserProfile[] | ContactsListResponse>('/users', params);
 
-  const data = response.data;
   if (Array.isArray(data)) return data;
   return data.users ?? data.data ?? [];
 }
 
-// ── Call history ───────────────────────────────────────────────────
+// ── Call history ───────────────────────────────────────────────────────────────
 
 export type CallDirection = 'incoming' | 'outgoing' | 'missed';
 
 export interface CallHistoryEntry {
-  /** Canonical id — may come as `id`, `_id`, or `callId` from the server. */
   id: string;
   callerId: string;
   calleeId?: string;
   receiverIds?: string[];
   callType?: 'audio' | 'video';
   callMode?: 'one-to-one' | 'conference';
-  /** Backend status string: 'initiated' | 'active' | 'rejected' | 'ended' | 'missed'. */
   status?: string;
-  /** The current user's own per-call invitation status (undefined for the caller). */
   participantStatus?: 'invited' | 'joined' | 'rejected' | 'left' | 'missed';
-  /** True if the call is currently ongoing (status === 'active'). */
   isActive?: boolean;
-  /** Number of participants currently joined (+ the caller while active). */
   participantCount?: number;
-  /** Derived client-side direction (optional, enriched by RecentCalls). */
   direction?: CallDirection;
   durationSeconds?: number;
   createdAt?: string;
   startedAt?: string;
   endedAt?: string;
-  // Enriched display fields merged from userStore
   callerName?: string;
   calleeName?: string;
   callerAvatar?: string | null;
@@ -73,12 +59,11 @@ interface CallHistoryResponse {
 }
 
 export async function getCallHistory(limit = 20): Promise<CallHistoryEntry[]> {
-  const response = await axiosClient.get<CallHistoryEntry[] | CallHistoryResponse>(
+  const data = await apiGet<CallHistoryEntry[] | CallHistoryResponse>(
     '/calls/history',
-    { params: { limit } }
+    { limit }
   );
 
-  const data = response.data;
   if (Array.isArray(data)) return data;
   return data.calls ?? data.data ?? [];
 }

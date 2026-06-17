@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
-import { axiosClient } from '$lib/api/client';
+import { apiGet } from '$lib/api/client';
 import type { AuthUser } from './auth.store';
 
 export interface UserProfile extends AuthUser {
@@ -80,9 +80,7 @@ function persistProfiles(profiles: Map<string, UserProfile>) {
 }
 
 async function defaultProfileLoader(userId: string) {
-  const response = await axiosClient.get<UserProfile>(`/users/${userId}`);
-
-  return response.data;
+  return apiGet<UserProfile>(`/users/${userId}`);
 }
 
 function createUserStore() {

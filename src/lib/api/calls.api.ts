@@ -1,11 +1,9 @@
-import { AxiosError } from 'axios';
-import { axiosClient } from './client';
-import { authStore } from '$lib/stores/auth.store';
+import { ApiError, apiGet, apiPost } from './client';
 
 export type CallType = 'audio' | 'video';
 
 export interface InitiateCallPayload {
-  calleeId?: string; // backward compatibility
+  calleeId?: string;
   receiverIds?: string[];
   callType: CallType;
   callMode: 'one-to-one' | 'conference';
@@ -51,58 +49,7 @@ export interface AcceptCallResponse {
 }
 
 export type RejectCallResponse = AcceptCallResponse;
-export type EndCallResponse = AcceptCallResponse;
-
-interface ApiErrorResponse {
-  message?: unknown;
-  error?: unknown;
-}
-
-class MissingAuthTokenError extends Error {
-  constructor() {
-    super('Your sign-in session is missing a token. Please sign in again before starting a call.');
-    this.name = 'MissingAuthTokenError';
-  }
-}
-
-export async function initiateCall(payload: InitiateCallPayload) {
-  const response = await axiosClient.post<InitiateCallResponse>(
-    '/calls/initiate',
-    payload,
-    getAuthRequestConfig()
-  );
-
-  return response.data;
-}
-
-export async function acceptCall(callId: string) {
-  const response = await axiosClient.post<AcceptCallResponse>(
-    `/calls/${encodeURIComponent(callId)}/accept`,
-    undefined,
-    getAuthRequestConfig()
-  );
-
-  return response.data;
-}
-
-export async function rejectCall(callId: string) {
-  const response = await axiosClient.post<RejectCallResponse>(
-    `/calls/${encodeURIComponent(callId)}/reject`,
-    undefined,
-    getAuthRequestConfig()
-  );
-
-  return response.data;
-}
-
-export async function getCall(callId: string) {
-  const response = await axiosClient.get<{ call: CallSummary }>(
-    `/calls/${encodeURIComponent(callId)}`,
-    getAuthRequestConfig()
-  );
-
-  return response.data;
-}
+export type EndCallResponse    = AcceptCallResponse;
 
 export interface AddParticipantResponse {
   message?: string;
@@ -110,29 +57,48 @@ export interface AddParticipantResponse {
   [key: string]: unknown;
 }
 
-export async function addParticipant(callId: string, userId: string) {
-  const response = await axiosClient.post<AddParticipantResponse>(
+// ── API calls ──────────────────────────────────────────────────────────────────
+
+export async function initiateCall(payload: InitiateCallPayload): Promise<InitiateCallResponse> {
+  return apiPost<InitiateCallResponse>('/calls/initiate', payload);
+}
+
+export async function acceptCall(callId: string): Promise<AcceptCallResponse> {
+  return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/accept`);
+}
+
+export async function rejectCall(callId: string): Promise<RejectCallResponse> {
+  return apiPost<RejectCallResponse>(`/calls/${encodeURIComponent(callId)}/reject`);
+}
+
+export async function getCall(callId: string): Promise<{ call: CallSummary }> {
+  return apiGet<{ call: CallSummary }>(`/calls/${encodeURIComponent(callId)}`);
+}
+
+export async function addParticipant(callId: string, userId: string): Promise<AddParticipantResponse> {
+  return apiPost<AddParticipantResponse>(
     `/calls/${encodeURIComponent(callId)}/add-participant`,
-    { userId },
-    getAuthRequestConfig()
+    { userId }
   );
-
-  return response.data;
 }
 
-export async function endCall(callId: string) {
-  const response = await axiosClient.post<EndCallResponse>(
-    `/calls/${encodeURIComponent(callId)}/end`,
-    undefined,
-    getAuthRequestConfig()
-  );
-
-  return response.data;
+export async function endCall(callId: string): Promise<EndCallResponse> {
+  return apiPost<EndCallResponse>(`/calls/${encodeURIComponent(callId)}/end`);
 }
+
+export async function startRecording(callId: string): Promise<AcceptCallResponse> {
+  return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/start`);
+}
+
+export async function stopRecording(callId: string): Promise<AcceptCallResponse> {
+  return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/stop`);
+}
+
+// ── Response helpers ───────────────────────────────────────────────────────────
 
 export function getCallIdentifier(
   response: InitiateCallResponse | AcceptCallResponse | RejectCallResponse | EndCallResponse
-) {
+): string | null {
   const nestedId = response.call?.id ?? response.call?._id;
   const id = response.callId ?? response.id ?? response._id ?? nestedId;
 
@@ -143,23 +109,20 @@ export function hasLiveKitCredentials(
   response: InitiateCallResponse | AcceptCallResponse
 ): response is (InitiateCallResponse | AcceptCallResponse) & { token: string; roomName: string } {
   return (
-    typeof response.token === 'string' &&
-    response.token.length > 0 &&
-    typeof response.roomName === 'string' &&
-    response.roomName.length > 0
+    typeof response.token    === 'string' && response.token.length    > 0 &&
+    typeof response.roomName === 'string' && response.roomName.length > 0
   );
 }
 
-export function getCallApiErrorMessage(error: unknown, fallback = 'The call request could not be completed.') {
-  if (error instanceof MissingAuthTokenError) {
-    return error.message;
-  }
-
-  if (error instanceof AxiosError) {
-    const data = error.response?.data as ApiErrorResponse | undefined;
+export function getCallApiErrorMessage(
+  error: unknown,
+  fallback = 'The call request could not be completed.'
+): string {
+  if (error instanceof ApiError) {
+    const data = error.body as { message?: unknown; error?: unknown } | undefined;
     const message = data?.message ?? data?.error;
 
-    if (error.response?.status === 401 && message === 'Authentication required') {
+    if (error.status === 401 && message === 'Authentication required') {
       return 'Your sign-in session was not sent with the call request. Please sign in again and retry.';
     }
 
@@ -169,36 +132,4 @@ export function getCallApiErrorMessage(error: unknown, fallback = 'The call requ
   }
 
   return fallback;
-}
-
-export async function startRecording(callId: string) {
-  const response = await axiosClient.post<AcceptCallResponse>(
-    `/calls/${encodeURIComponent(callId)}/record/start`,
-    undefined,
-    getAuthRequestConfig()
-  );
-  return response.data;
-}
-
-export async function stopRecording(callId: string) {
-  const response = await axiosClient.post<AcceptCallResponse>(
-    `/calls/${encodeURIComponent(callId)}/record/stop`,
-    undefined,
-    getAuthRequestConfig()
-  );
-  return response.data;
-}
-
-function getAuthRequestConfig() {
-  const accessToken = authStore.getAccessToken();
-
-  if (!accessToken) {
-    throw new MissingAuthTokenError();
-  }
-
-  return {
-    headers: {
-      Authorization: `Bearer ${accessToken}`
-    }
-  };
 }

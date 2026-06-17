@@ -1,5 +1,6 @@
-import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { authStore } from '$lib/stores/auth.store';
+
+// ── Public types ───────────────────────────────────────────────────────────────
 
 export type AccessToken = string | null | undefined;
 
@@ -23,8 +24,7 @@ export interface ApiClientOptions {
   clearTokens?: () => void | Promise<void>;
 }
 
-const DEFAULT_REFRESH_PATH = '/auth/refresh';
-export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// ── ApiError ───────────────────────────────────────────────────────────────────
 
 export class ApiError extends Error {
   status: number;
@@ -40,39 +40,24 @@ export class ApiError extends Error {
   }
 }
 
-export const axiosClient = axios.create({
-  baseURL: DEFAULT_BASE_URL,
-  withCredentials: true,
-  headers: {
-    Accept: 'application/json'
-  }
-});
+// ── Constants ──────────────────────────────────────────────────────────────────
 
-axiosClient.interceptors.request.use((config) => {
-  const accessToken = authStore.getAccessToken();
-  config.headers = AxiosHeaders.from(config.headers);
+const DEFAULT_REFRESH_PATH = '/auth/refresh';
+export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-  if (accessToken) {
-    config.headers.set('Authorization', `Bearer ${accessToken}`);
-  }
+// ── URL helpers ────────────────────────────────────────────────────────────────
 
-  return config;
-});
-
-export function joinUrl(baseUrl: string | undefined, input: RequestInfo | URL) {
+export function joinUrl(baseUrl: string | undefined, input: RequestInfo | URL): string {
   if (input instanceof Request) return input.url;
   if (input instanceof URL) return input.toString();
 
   const url = input.toString();
-
-  if (!baseUrl || /^https?:\/\//i.test(url)) {
-    return url;
-  }
+  if (!baseUrl || /^https?:\/\//i.test(url)) return url;
 
   return `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }
 
-function isRefreshRequest(input: RequestInfo | URL, refreshPath: string) {
+function isRefreshRequest(input: RequestInfo | URL, refreshPath: string): boolean {
   const url = input instanceof Request ? input.url : input.toString();
   return url.endsWith(refreshPath);
 }
@@ -92,18 +77,20 @@ function parseRefreshResponse(data: unknown): RefreshResult {
   return { accessToken };
 }
 
+// ── Core fetch client factory ──────────────────────────────────────────────────
+
 export function createApiClient(options: ApiClientOptions = {}) {
-  const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
-  const refreshPath = options.refreshPath ?? DEFAULT_REFRESH_PATH;
-  const fetcher = options.fetch ?? fetch;
+  const baseUrl        = options.baseUrl        ?? DEFAULT_BASE_URL;
+  const refreshPath    = options.refreshPath    ?? DEFAULT_REFRESH_PATH;
+  const fetcher        = options.fetch          ?? fetch;
   const getAccessToken = options.getAccessToken ?? (() => authStore.getAccessToken());
   const getRefreshToken = options.getRefreshToken ?? (() => authStore.getRefreshToken());
   const setAccessToken = options.setAccessToken ?? ((token: string) => authStore.setAccessToken(token));
-  const clearTokens = options.clearTokens ?? (() => authStore.clear());
+  const clearTokens    = options.clearTokens    ?? (() => authStore.clear());
 
   let refreshPromise: Promise<string> | null = null;
 
-  async function refreshAccessToken() {
+  async function refreshAccessToken(): Promise<string> {
     refreshPromise ??= (async () => {
       const refreshToken = await getRefreshToken();
       const headers = new Headers({ Accept: 'application/json' });
@@ -128,7 +115,6 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
       const { accessToken } = parseRefreshResponse(await response.json());
       await setAccessToken(accessToken);
-
       return accessToken;
     })();
 
@@ -139,12 +125,13 @@ export function createApiClient(options: ApiClientOptions = {}) {
     }
   }
 
-  async function buildRequest(input: RequestInfo | URL, init: RequestInit = {}, accessToken?: AccessToken) {
+  async function buildRequest(
+    input: RequestInfo | URL,
+    init: RequestInit = {},
+    accessToken?: AccessToken
+  ) {
     const headers = new Headers(input instanceof Request ? input.headers : undefined);
-
-    new Headers(init.headers).forEach((value, key) => {
-      headers.set(key, value);
-    });
+    new Headers(init.headers).forEach((value, key) => headers.set(key, value));
 
     if (accessToken && !headers.has('Authorization')) {
       headers.set('Authorization', `Bearer ${accessToken}`);
@@ -152,32 +139,23 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
     if (input instanceof Request) {
       const request = new Request(input, { ...init, headers });
-
-      return {
-        input: request,
-        init: undefined,
-        retryInput: request.clone(),
-        retryInit: undefined
-      };
+      return { input: request, init: undefined, retryInput: request.clone(), retryInit: undefined };
     }
 
     const requestInput = joinUrl(baseUrl, input);
-
     return {
       input: requestInput,
-      init: {
-        ...init,
-        headers
-      },
+      init: { ...init, headers },
       retryInput: requestInput,
-      retryInit: {
-        ...init,
-        headers: new Headers(headers)
-      }
+      retryInit: { ...init, headers: new Headers(headers) }
     };
   }
 
-  async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  /**
+   * Authenticated fetch. Adds Bearer token, retries once on 401 after
+   * refreshing the access token. Returns the raw Response.
+   */
+  async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
     const accessToken = await getAccessToken();
     const request = await buildRequest(input, init, accessToken);
     const response = await fetcher(request.input, request.init);
@@ -197,54 +175,103 @@ export function createApiClient(options: ApiClientOptions = {}) {
       if (request.retryInput instanceof Request) {
         return fetcher(new Request(request.retryInput, { headers }));
       }
-
       return fetcher(request.retryInput, { ...request.retryInit, headers });
     } catch {
       return response;
     }
   }
 
-  return {
-    fetch: apiFetch,
-    refreshAccessToken
-  };
+  return { fetch: apiFetch, refreshAccessToken };
 }
+
+// ── Default singleton ──────────────────────────────────────────────────────────
 
 export const apiClient = createApiClient();
 
-type RetriableAxiosRequestConfig = InternalAxiosRequestConfig & {
-  _retry?: boolean;
-};
-
-axiosClient.interceptors.response.use(
-  (response) => response,
-  async (error: unknown) => {
-    if (!axios.isAxiosError(error) || !error.response || !error.config) {
-      throw error;
-    }
-
-    const originalRequest = error.config as RetriableAxiosRequestConfig;
-
-    if (
-      error.response.status !== 401 ||
-      originalRequest._retry ||
-      isRefreshRequest(originalRequest.url ?? '', DEFAULT_REFRESH_PATH)
-    ) {
-      throw error;
-    }
-
-    originalRequest._retry = true;
-
-    try {
-      const accessToken = await apiClient.refreshAccessToken();
-      originalRequest.headers = AxiosHeaders.from(originalRequest.headers);
-      originalRequest.headers.set('Authorization', `Bearer ${accessToken}`);
-
-      return axiosClient(originalRequest);
-    } catch {
-      throw error;
-    }
-  }
-);
-
+/** Authenticated fetch passthrough — use typed helpers below when possible. */
 export const apiFetch = apiClient.fetch;
+
+// ── Response parsing ───────────────────────────────────────────────────────────
+
+/** Parse a Response to T, throwing ApiError on non-2xx. */
+export async function parseResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let body: unknown;
+    try { body = await response.clone().json(); } catch { /* ignore */ }
+    const errorBody = body as { message?: unknown; error?: unknown } | undefined;
+    const detail =
+      (typeof errorBody?.message === 'string' && errorBody.message) ||
+      (typeof errorBody?.error   === 'string' && errorBody.error)   ||
+      response.statusText;
+    throw new ApiError(`HTTP ${response.status}: ${detail}`, {
+      status: response.status,
+      statusText: response.statusText,
+      body
+    });
+  }
+
+  if (response.status === 204) return undefined as T;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    const text = await response.text();
+    return (text || undefined) as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+// ── Typed convenience helpers ──────────────────────────────────────────────────
+
+type Params = Record<string, string | number | boolean | undefined | null>;
+
+function buildUrl(path: string, params?: Params): string {
+  if (!params) return path;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) qs.set(k, String(v));
+  }
+  const q = qs.toString();
+  return q ? `${path}?${q}` : path;
+}
+
+function jsonHeaders(body?: unknown): HeadersInit {
+  return body !== undefined ? { 'Content-Type': 'application/json' } : {};
+}
+
+export async function apiGet<T = unknown>(path: string, params?: Params): Promise<T> {
+  const response = await apiFetch(buildUrl(path, params));
+  return parseResponse<T>(response);
+}
+
+export async function apiPost<T = unknown>(path: string, body?: unknown): Promise<T> {
+  const response = await apiFetch(path, {
+    method: 'POST',
+    headers: jsonHeaders(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  return parseResponse<T>(response);
+}
+
+export async function apiPut<T = unknown>(path: string, body?: unknown): Promise<T> {
+  const response = await apiFetch(path, {
+    method: 'PUT',
+    headers: jsonHeaders(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  return parseResponse<T>(response);
+}
+
+export async function apiPatch<T = unknown>(path: string, body?: unknown): Promise<T> {
+  const response = await apiFetch(path, {
+    method: 'PATCH',
+    headers: jsonHeaders(body),
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  return parseResponse<T>(response);
+}
+
+export async function apiDelete<T = unknown>(path: string): Promise<T> {
+  const response = await apiFetch(path, { method: 'DELETE' });
+  return parseResponse<T>(response);
+}

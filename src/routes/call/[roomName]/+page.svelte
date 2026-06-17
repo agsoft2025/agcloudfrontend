@@ -26,9 +26,8 @@
 
   import { callStore, type CallParticipantState } from '$lib/stores/call.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
-  import { liveKitClient } from '$lib/livekit/LiveKitClient';
+  import { liveKitClient, getLiveKitToken } from '$lib/livekit/LiveKitClient';
   import { bindCallEvents } from '$lib/livekit/useCall';
-  import { getLiveKitToken } from '$lib/service/livekit';
   import {
     endCall,
     acceptCall,

@@ -21,7 +21,7 @@
  */
 import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
-import { axiosClient } from '$lib/api/client';
+import { apiGet } from '$lib/api/client';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -161,10 +161,10 @@ function createPresenceStore(defaultIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
     update((s) => ({ ...s, isLoading: true, error: null }));
 
     try {
-      const response = await axiosClient.get<unknown>('/users/presence');
-      console.debug('[presence] raw API response:', response.data);
+      const data = await apiGet<unknown>('/users/presence');
+      console.debug('[presence] raw API response:', data);
 
-      const presences = parsePresenceResponse(response.data);
+      const presences = parsePresenceResponse(data);
       console.debug('[presence] parsed entries:', presences.size);
 
       update((s) => ({

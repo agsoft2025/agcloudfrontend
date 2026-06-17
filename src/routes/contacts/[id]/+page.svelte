@@ -12,7 +12,7 @@
   import Button from '$lib/components/atoms/Button.svelte';
   import { presenceStore, type PresenceStatus } from '$lib/stores/presence.store';
   import { userStore, type UserProfile } from '$lib/stores/user.store';
-  import { axiosClient } from '$lib/api/client';
+  import { apiPost } from '$lib/api/client';
   import {
     initiateCall,
     getCallIdentifier,
@@ -126,7 +126,7 @@
     isBlockLoading = true;
     blockError = null;
     try {
-      await axiosClient.post(`/users/${contact.id}/block`);
+      await apiPost(`/users/${contact.id}/block`);
       isBlocked = true;
     } catch (err) {
       blockError = err instanceof Error ? err.message : 'Could not block user.';
@@ -140,7 +140,7 @@
     isBlockLoading = true;
     blockError = null;
     try {
-      await axiosClient.post(`/users/${contact.id}/unblock`);
+      await apiPost(`/users/${contact.id}/unblock`);
       isBlocked = false;
     } catch (err) {
       blockError = err instanceof Error ? err.message : 'Could not unblock user.';

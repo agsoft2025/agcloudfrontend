@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { authStore } from '$lib/stores/auth.store';
   import { themeStore } from '$lib/stores/theme.store';
+  import OfflineBanner from '$lib/components/OfflineBanner.svelte';
 
   onMount(() => {
     // Re-read auth session from localStorage (handles hard refresh)
@@ -16,4 +17,5 @@
   });
 </script>
 
+<OfflineBanner />
 <slot />

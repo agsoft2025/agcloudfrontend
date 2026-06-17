@@ -1,5 +1,5 @@
-import { AxiosError } from 'axios';
-import { axiosClient } from './client';
+import { apiPost } from './client';
+import { ApiError } from './client';
 import { authStore, type AuthUser } from '$lib/stores/auth.store';
 import { userStore } from '$lib/stores/user.store';
 
@@ -39,39 +39,24 @@ export interface ResetPasswordResponse {
   message?: string;
 }
 
-interface ApiErrorResponse {
-  message?: unknown;
-  error?: unknown;
+export async function signUp(payload: SignUpPayload): Promise<SignUpResponse> {
+  return apiPost<SignUpResponse>('/auth/signup', payload);
 }
 
-export async function signUp(payload: SignUpPayload) {
-  const response = await axiosClient.post<SignUpResponse>('/auth/signup', payload);
-
-  return response.data;
+export async function signIn(payload: SignInPayload): Promise<SignInResponse> {
+  return apiPost<SignInResponse>('/auth/signin', payload);
 }
 
-export async function signIn(payload: SignInPayload) {
-  const response = await axiosClient.post<SignInResponse>('/auth/signin', payload);
-
-  return response.data;
+export async function signOut(): Promise<{ message?: string }> {
+  return apiPost<{ message?: string }>('/auth/signout');
 }
 
-export async function signOut() {
-  const response = await axiosClient.post<{ message?: string }>('/auth/signout');
-
-  return response.data;
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> {
+  return apiPost<ForgotPasswordResponse>('/auth/forgot-password', payload);
 }
 
-export async function forgotPassword(payload: ForgotPasswordPayload) {
-  const response = await axiosClient.post<ForgotPasswordResponse>('/auth/forgot-password', payload);
-
-  return response.data;
-}
-
-export async function resetPassword(payload: ResetPasswordPayload) {
-  const response = await axiosClient.post<ResetPasswordResponse>('/api/auth/reset-password', payload);
-
-  return response.data;
+export async function resetPassword(payload: ResetPasswordPayload): Promise<ResetPasswordResponse> {
+  return apiPost<ResetPasswordResponse>('/api/auth/reset-password', payload);
 }
 
 export function storeAuthTokens(data: unknown) {
@@ -111,9 +96,9 @@ export function hasAuthToken(data: unknown) {
   return typeof accessToken === 'string' && accessToken.length > 0;
 }
 
-export function getAuthErrorMessage(error: unknown, fallback = 'Unable to sign in. Please try again.') {
-  if (error instanceof AxiosError) {
-    const data = error.response?.data as ApiErrorResponse | undefined;
+export function getAuthErrorMessage(error: unknown, fallback = 'Unable to sign in. Please try again.'): string {
+  if (error instanceof ApiError) {
+    const data = error.body as { message?: unknown; error?: unknown } | undefined;
     const message = data?.message ?? data?.error;
 
     if (typeof message === 'string' && message.length > 0) {
