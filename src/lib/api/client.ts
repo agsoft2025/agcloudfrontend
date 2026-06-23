@@ -1,12 +1,4 @@
-import { authStore } from '$lib/stores/auth.store';
-
 // ── Public types ───────────────────────────────────────────────────────────────
-
-export type AccessToken = string | null | undefined;
-
-export interface RefreshResult {
-  accessToken: string;
-}
 
 export interface ApiErrorDetails {
   status: number;
@@ -16,12 +8,7 @@ export interface ApiErrorDetails {
 
 export interface ApiClientOptions {
   baseUrl?: string;
-  refreshPath?: string;
   fetch?: typeof fetch;
-  getAccessToken?: () => AccessToken | Promise<AccessToken>;
-  getRefreshToken?: () => AccessToken | Promise<AccessToken>;
-  setAccessToken?: (token: string) => void | Promise<void>;
-  clearTokens?: () => void | Promise<void>;
 }
 
 // ── ApiError ───────────────────────────────────────────────────────────────────
@@ -42,7 +29,6 @@ export class ApiError extends Error {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const DEFAULT_REFRESH_PATH = '/auth/refresh';
 export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 // ── URL helpers ────────────────────────────────────────────────────────────────
@@ -57,138 +43,29 @@ export function joinUrl(baseUrl: string | undefined, input: RequestInfo | URL): 
   return `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }
 
-function isRefreshRequest(input: RequestInfo | URL, refreshPath: string): boolean {
-  const url = input instanceof Request ? input.url : input.toString();
-  return url.endsWith(refreshPath);
-}
-
-function parseRefreshResponse(data: unknown): RefreshResult {
-  if (!data || typeof data !== 'object') {
-    throw new Error('Refresh response did not include an access token.');
-  }
-
-  const value = data as { accessToken?: unknown; token?: unknown };
-  const accessToken = value.accessToken ?? value.token;
-
-  if (typeof accessToken !== 'string' || accessToken.length === 0) {
-    throw new Error('Refresh response did not include an access token.');
-  }
-
-  return { accessToken };
-}
-
 // ── Core fetch client factory ──────────────────────────────────────────────────
 
 export function createApiClient(options: ApiClientOptions = {}) {
-  const baseUrl        = options.baseUrl        ?? DEFAULT_BASE_URL;
-  const refreshPath    = options.refreshPath    ?? DEFAULT_REFRESH_PATH;
-  const fetcher        = options.fetch          ?? fetch;
-  const getAccessToken = options.getAccessToken ?? (() => authStore.getAccessToken());
-  const getRefreshToken = options.getRefreshToken ?? (() => authStore.getRefreshToken());
-  const setAccessToken = options.setAccessToken ?? ((token: string) => authStore.setAccessToken(token));
-  const clearTokens    = options.clearTokens    ?? (() => authStore.clear());
-
-  let refreshPromise: Promise<string> | null = null;
-
-  async function refreshAccessToken(): Promise<string> {
-    refreshPromise ??= (async () => {
-      const refreshToken = await getRefreshToken();
-      const headers = new Headers({ Accept: 'application/json' });
-      let body: BodyInit | undefined;
-
-      if (refreshToken) {
-        headers.set('Content-Type', 'application/json');
-        body = JSON.stringify({ refreshToken });
-      }
-
-      const response = await fetcher(joinUrl(baseUrl, refreshPath), {
-        method: 'POST',
-        headers,
-        body,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        await clearTokens();
-        throw new Error(`Token refresh failed with status ${response.status}.`);
-      }
-
-      const { accessToken } = parseRefreshResponse(await response.json());
-      await setAccessToken(accessToken);
-      return accessToken;
-    })();
-
-    try {
-      return await refreshPromise;
-    } finally {
-      refreshPromise = null;
-    }
-  }
-
-  async function buildRequest(
-    input: RequestInfo | URL,
-    init: RequestInit = {},
-    accessToken?: AccessToken
-  ) {
-    const headers = new Headers(input instanceof Request ? input.headers : undefined);
-    new Headers(init.headers).forEach((value, key) => headers.set(key, value));
-
-    if (accessToken && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${accessToken}`);
-    }
-
-    if (input instanceof Request) {
-      const request = new Request(input, { ...init, headers });
-      return { input: request, init: undefined, retryInput: request.clone(), retryInit: undefined };
-    }
-
-    const requestInput = joinUrl(baseUrl, input);
-    return {
-      input: requestInput,
-      init: { ...init, headers },
-      retryInput: requestInput,
-      retryInit: { ...init, headers: new Headers(headers) }
-    };
-  }
+  const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+  const fetcher = options.fetch ?? fetch;
 
   /**
-   * Authenticated fetch. Adds Bearer token, retries once on 401 after
-   * refreshing the access token. Returns the raw Response.
+   * Fetch with credentials: 'include' so the HttpOnly session cookie is sent
+   * on every request. No Authorization header — auth is handled server-side.
    */
   async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-    const accessToken = await getAccessToken();
-    const request = await buildRequest(input, init, accessToken);
-    const response = await fetcher(request.input, request.init);
-
-    if (response.status !== 401 || isRefreshRequest(request.input, refreshPath)) {
-      return response;
-    }
-
-    try {
-      const nextAccessToken = await refreshAccessToken();
-      const headers =
-        request.retryInput instanceof Request
-          ? new Headers(request.retryInput.headers)
-          : new Headers(request.retryInit?.headers);
-      headers.set('Authorization', `Bearer ${nextAccessToken}`);
-
-      if (request.retryInput instanceof Request) {
-        return fetcher(new Request(request.retryInput, { headers }));
-      }
-      return fetcher(request.retryInput, { ...request.retryInit, headers });
-    } catch {
-      return response;
-    }
+    const url = joinUrl(baseUrl, input);
+    return fetcher(url, { ...init, credentials: 'include' });
   }
 
-  return { fetch: apiFetch, refreshAccessToken };
+  return { fetch: apiFetch };
 }
 
 // ── Default singleton ──────────────────────────────────────────────────────────
 
 export const apiClient = createApiClient();
 
-/** Authenticated fetch passthrough — use typed helpers below when possible. */
+/** Fetch passthrough — use typed helpers below when possible. */
 export const apiFetch = apiClient.fetch;
 
 // ── Response parsing ───────────────────────────────────────────────────────────

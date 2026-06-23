@@ -170,14 +170,16 @@
     min-block-size: 0;
     /* No hard-coded aspect-ratio here — parent containers (thumbnail-item or
        grid-item) set the dimensions; tiles always fill their allocated space. */
-    transition: border-color 250ms ease, box-shadow 250ms ease, transform 250ms ease;
+    transition: transform 250ms ease;
     container-type: inline-size;
   }
 
-  .tile.speaking {
-    border-color: #34d399;
-    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.25);
-  }
+  /* .tile.speaking intentionally has NO border-color or box-shadow change.
+     border-color is non-compositable: it triggers paint on .tile which has
+     overflow:hidden + border-radius (a clip render surface). Chrome must then
+     re-composite the entire clip context — including the <video> GPU layer —
+     causing a brief compositor desync visible as a blink. The .speaking-ring
+     overlay (will-change: opacity) provides the visual indicator at zero paint cost. */
 
   .tile.pinned {
     border-color: rgba(78, 135, 255, 0.55);
@@ -360,19 +362,20 @@
     color: rgba(255, 255, 255, 0.6);
   }
 
-  /* Speaking ring animation */
+  /* Speaking ring animation — will-change:opacity pre-allocates a compositor
+     layer so the shimmer opacity pulse never triggers a paint on the parent. */
   .speaking-ring {
     position: absolute;
     inset: 0;
     border-radius: 10px;
     border: 3px solid #34d399;
-    background-size: 200% 100%;
     animation: speaker-shimmer 1.8s linear infinite;
     box-shadow:
       inset 0 0 0 1px rgba(52, 211, 153, 0.32),
       0 0 18px rgba(52, 211, 153, 0.18);
     pointer-events: none;
     z-index: 3;
+    will-change: opacity;
   }
 
   @keyframes speaker-shimmer {

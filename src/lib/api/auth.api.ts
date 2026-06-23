@@ -1,7 +1,6 @@
-import { apiPost } from './client';
+import { apiGet, apiPost } from './client';
 import { ApiError } from './client';
-import { authStore, type AuthUser } from '$lib/stores/auth.store';
-import { userStore } from '$lib/stores/user.store';
+import type { AuthUser } from '$lib/stores/auth.store';
 
 export interface SignInPayload {
   email: string;
@@ -24,12 +23,9 @@ export interface ResetPasswordPayload {
 export interface SignInResponse {
   message?: string;
   user?: AuthUser;
-  accessToken?: string;
-  token?: string;
-  refreshToken?: string;
 }
 
-export type SignUpResponse = SignInResponse;
+export type SignUpResponse = { message?: string };
 
 export interface ForgotPasswordResponse {
   message?: string;
@@ -59,41 +55,9 @@ export async function resetPassword(payload: ResetPasswordPayload): Promise<Rese
   return apiPost<ResetPasswordResponse>('/api/auth/reset-password', payload);
 }
 
-export function storeAuthTokens(data: unknown) {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
-
-  const value = data as {
-    accessToken?: unknown;
-    token?: unknown;
-    refreshToken?: unknown;
-    user?: unknown;
-  };
-  const accessToken = value.accessToken ?? value.token;
-
-  authStore.setSession({
-    accessToken: typeof accessToken === 'string' ? accessToken : undefined,
-    refreshToken: typeof value.refreshToken === 'string' ? value.refreshToken : undefined,
-    user: isAuthUser(value.user) ? value.user : undefined
-  });
-
-  if (isAuthUser(value.user)) {
-    userStore.setProfile(value.user);
-  }
-
-  return typeof accessToken === 'string' && accessToken.length > 0;
-}
-
-export function hasAuthToken(data: unknown) {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
-
-  const value = data as { accessToken?: unknown; token?: unknown };
-  const accessToken = value.accessToken ?? value.token;
-
-  return typeof accessToken === 'string' && accessToken.length > 0;
+/** Fetch the current authenticated user from the server (verifies the cookie). */
+export async function getSession(): Promise<AuthUser> {
+  return apiGet<AuthUser>('/auth/me');
 }
 
 export function getAuthErrorMessage(error: unknown, fallback = 'Unable to sign in. Please try again.'): string {
@@ -109,12 +73,8 @@ export function getAuthErrorMessage(error: unknown, fallback = 'Unable to sign i
   return fallback;
 }
 
-function isAuthUser(value: unknown): value is AuthUser {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
+export function isAuthUser(value: unknown): value is AuthUser {
+  if (!value || typeof value !== 'object') return false;
   const user = value as { id?: unknown; email?: unknown };
-
   return typeof user.id === 'string' && typeof user.email === 'string';
 }
