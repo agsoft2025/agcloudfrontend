@@ -583,14 +583,14 @@
      Uses a moving gradient along the border-box.                */
   .speaking-ring {
     position: absolute;
-    inset: -2px;
-    border-radius: calc(var(--tile-radius) + 2px);
-    border: 3px solid transparent;
-    background:
-      linear-gradient(var(--tile-bg), var(--tile-bg)) padding-box,
-      linear-gradient(90deg, #34d399, #059669, #34d399) border-box;
+    inset: 0;
+    border-radius: var(--tile-radius);
+    border: 3px solid #34d399;
     background-size: 200% 100%;
     animation: ring-shimmer 2s linear infinite;
+    box-shadow:
+      inset 0 0 0 1px rgba(52, 211, 153, 0.32),
+      0 0 18px rgba(52, 211, 153, 0.18);
     pointer-events: none;
     z-index: 3;
   }
@@ -600,8 +600,8 @@
   }
 
   @keyframes ring-shimmer {
-    from { background-position: 0% 0%; }
-    to   { background-position: 200% 0%; }
+    0%, 100% { opacity: 0.78; }
+    50%      { opacity: 1; }
   }
 
   /* ── Poor network warning pip ────────────────────────────────

@@ -363,19 +363,21 @@
   /* Speaking ring animation */
   .speaking-ring {
     position: absolute;
-    inset: -2px;
-    border-radius: 13px;
-    border: 3px solid transparent;
-    background: linear-gradient(#141e2e, #141e2e) padding-box,
-                linear-gradient(90deg, #34d399, #059669, #34d399) border-box;
+    inset: 0;
+    border-radius: 10px;
+    border: 3px solid #34d399;
     background-size: 200% 100%;
     animation: speaker-shimmer 1.8s linear infinite;
+    box-shadow:
+      inset 0 0 0 1px rgba(52, 211, 153, 0.32),
+      0 0 18px rgba(52, 211, 153, 0.18);
     pointer-events: none;
+    z-index: 3;
   }
 
   @keyframes speaker-shimmer {
-    from { background-position: 0% 0%; }
-    to   { background-position: 200% 0%; }
+    0%, 100% { opacity: 0.78; }
+    50%      { opacity: 1; }
   }
 
   /* Hide labels at very small tile sizes */
