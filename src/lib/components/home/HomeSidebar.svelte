@@ -1,38 +1,32 @@
-<script lang="ts" context="module">
-  export type HomeSection = 'one-to-one' | 'contact' | 'calls';
-
-  export interface HomeSidebarItem {
-    id: HomeSection;
-    label: string;
-    description: string;
-  }
-</script>
-
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import NavItem from './NavItem.svelte';
+  import SettingsNavItem from './SettingsNavItem.svelte';
   import { signOut } from '$lib/api/auth.api';
   import { authStore, type AuthUser } from '$lib/stores/auth.store';
   import { userStore } from '$lib/stores/user.store';
   import ThemeToggle from '$lib/components/atoms/ThemeToggle.svelte';
 
-  export let items: HomeSidebarItem[] = [];
-  export let selected: HomeSection;
   export let mobileOpen = false;
 
   let isLoggingOut = false;
 
   $: user = $authStore.user;
+  $: isContactsActive = $page.url.pathname === '/home' || $page.url.pathname.startsWith('/contacts');
 
-  const phoneIcon = `<path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
-
-  function handleSelect(id: HomeSection) {
-    selected = id;
-    mobileOpen = false;
-  }
+  const contactsIcon = `<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>`;
 
   function closeMobile() {
     mobileOpen = false;
+  }
+
+  function handleContactsClick() {
+    mobileOpen = false;
+    goto('/home');
   }
 
   function getInitials(profile: AuthUser | null) {
@@ -43,40 +37,28 @@
         .map((part) => part[0]?.toUpperCase() ?? '')
         .join('');
     }
-
     return profile?.email?.[0]?.toUpperCase() ?? 'U';
   }
 
   function getDisplayName(profile: AuthUser | null) {
-    if (profile?.displayName?.trim()) {
-      return profile.displayName.trim();
-    }
-
+    if (profile?.displayName?.trim()) return profile.displayName.trim();
     if (profile?.email) {
       const local = profile.email.split('@')[0];
-      return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+      return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     }
-
     return 'User';
   }
 
   function getPlanLabel(profile: AuthUser | null) {
     if (profile?.role?.trim()) {
-      return profile.role
-        .replace(/[_-]+/g, ' ')
-        .replace(/\b\w/g, (char) => char.toUpperCase());
+      return profile.role.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     }
-
     return 'Pro Enterprise';
   }
 
   async function handleLogout() {
-    if (isLoggingOut) {
-      return;
-    }
-
+    if (isLoggingOut) return;
     isLoggingOut = true;
-
     try {
       await signOut();
     } catch {
@@ -86,7 +68,6 @@
       userStore.clear();
       mobileOpen = false;
       isLoggingOut = false;
-      // replaceState removes /home from history so Back cannot return to it
       await goto('/signin', { replaceState: true });
     }
   }
@@ -126,21 +107,23 @@
 
   <div class="sidebar-main">
     <nav class="nav-section" aria-label="Main menu">
+      <!-- Contacts — always present, active on /home and /contacts/* -->
+      <NavItem
+        label="Contacts"
+        description="View and call your contacts"
+        active={isContactsActive}
+        on:click={handleContactsClick}
+      >
+        <svelte:fragment slot="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none">
+            {@html contactsIcon}
+          </svg>
+        </svelte:fragment>
+      </NavItem>
 
-      {#each items as item (item.id)}
-        <NavItem
-          label={item.label}
-          description={item.description}
-          active={selected === item.id}
-          on:click={() => handleSelect(item.id)}
-        >
-          <svelte:fragment slot="icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-              {@html phoneIcon}
-            </svg>
-          </svelte:fragment>
-        </NavItem>
-      {/each}
+      <hr class="nav-divider" aria-hidden="true" />
+
+      <SettingsNavItem />
     </nav>
   </div>
 
@@ -179,7 +162,6 @@
 <style lang="postcss">
   .sidebar {
     --sidebar-width: 325px;
-    /* Sidebar colours come from themes.css — see --sidebar-bg, --sidebar-border */
     --sidebar-transition: 260ms cubic-bezier(0.16, 1, 0.3, 1);
 
     position: sticky;
@@ -204,12 +186,8 @@
   }
 
   @keyframes fade-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   .sidebar-header {
@@ -276,6 +254,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .nav-divider {
+    block-size: 1px;
+    border: none;
+    background: var(--sidebar-border);
+    margin-block: 0.5rem;
+    margin-inline: 0.25rem;
   }
 
   .sidebar-footer {
@@ -370,9 +356,7 @@
   }
 
   @media (min-width: 801px) {
-    .close-btn {
-      display: none;
-    }
+    .close-btn { display: none; }
   }
 
   @media (max-width: 800px) {
@@ -393,8 +377,6 @@
       box-shadow: 12px 0 48px rgba(0, 0, 0, 0.45);
     }
 
-    .close-btn {
-      display: grid;
-    }
+    .close-btn { display: grid; }
   }
 </style>

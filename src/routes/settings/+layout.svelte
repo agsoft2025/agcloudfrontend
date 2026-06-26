@@ -1,47 +1,31 @@
 <!--
-  (app)/+layout.svelte — Authenticated application shell
-  =======================================================
-  Wraps every protected route with:
-    - Auth guard: redirects unauthenticated users to /signin
-    - HomeSidebar: persistent left-nav visible on all app pages
-    - Mobile topbar: hamburger button shown below 800px
-    - GlobalCallManager: handles incoming/active call overlays
-    - <slot />: injects the current page's content into the shell
+  settings/+layout.svelte — App shell for /settings/* routes
+  ===========================================================
+  Identical shell to home/+layout.svelte: persistent sidebar,
+  mobile topbar, auth guard. No GlobalCallManager here — that
+  lives in home/+layout.svelte for call-capable pages.
 
-  Route coverage (all share this layout via the (app) group):
-    /home              → contacts dashboard
-    /settings/profile  → profile edit page
-    /settings/*        → future settings pages
+  NOTE: The ideal long-term architecture is one shared
+  (app)/+layout.svelte covering both home and settings route
+  trees — see routes/(app)/+layout.svelte for that target.
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { authStore } from '$lib/stores/auth.store';
   import HomeSidebar from '$lib/components/home/HomeSidebar.svelte';
-  import GlobalCallManager from '$lib/components/calls/GlobalCallManager.svelte';
 
   let mobileNavOpen = false;
+
+  $: if (browser && $authStore.isInitialized && !$authStore.isAuthenticated) {
+    goto('/signin', { replaceState: true });
+  }
 </script>
-
-<svelte:head>
-  <!-- Prevent layout shift while auth check completes -->
-</svelte:head>
-
-<!--
-  Auth guard: redirect unauthenticated users away.
-  replaceState removes the protected URL from history so Back
-  cannot return here after sign-out.
--->
-{#if browser && $authStore.isInitialized && !$authStore.isAuthenticated}
-  {void goto('/signin', { replaceState: true })}
-{/if}
 
 {#if $authStore.isAuthenticated}
   <div class="app-layout">
-    <!-- ── Persistent sidebar ──────────────────────────────────── -->
     <HomeSidebar bind:mobileOpen={mobileNavOpen} />
 
-    <!-- ── Main content area ──────────────────────────────────── -->
     <div class="content-shell">
       <!-- Mobile-only topbar with hamburger -->
       <header class="topbar" aria-label="Mobile navigation">
@@ -54,31 +38,20 @@
           on:click={() => (mobileNavOpen = true)}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path
-              d="M3 5h14M3 10h14M3 15h14"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-            />
+            <path d="M3 5h14M3 10h14M3 15h14"
+              stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
           </svg>
         </button>
         <div class="topbar-brand">AG Cloud</div>
-        <!-- Spacer keeps brand centred on mobile -->
         <div style="inline-size: 2.25rem;" aria-hidden="true"></div>
       </header>
 
-      <!-- Page content injected here -->
       <slot />
     </div>
   </div>
-
-  <!-- Incoming / active call overlay — global, not tied to any route -->
-  <GlobalCallManager />
 {/if}
 
 <style lang="postcss">
-  /* ── Shell ─────────────────────────────────────────────────── */
-
   .app-layout {
     display: flex;
     block-size: 100dvh;
@@ -92,8 +65,6 @@
     min-inline-size: 0;
     overflow: hidden;
   }
-
-  /* ── Mobile topbar ─────────────────────────────────────────── */
 
   .topbar {
     display: none;
