@@ -140,13 +140,19 @@ export function initCallSignaling(): void {
     emitLifecycleEvent('call:participant-rejected', data.callId, data.userId);
   });
 
-  socket.on('presence:update', (data: PresenceUpdateEvent) => {
+  // Backend emits presence changes as typed events: USER_ONLINE | USER_OFFLINE |
+  // USER_AWAY | PRESENCE_UPDATED.  Each payload matches PresenceUpdateEvent.
+  const applyPresenceEvent = (data: PresenceUpdateEvent) => {
     presenceStore.setPresence({
       userId: data.userId,
       status: data.status,
       lastSeen: data.lastSeen
     });
-  });
+  };
+  socket.on('USER_ONLINE',       applyPresenceEvent);
+  socket.on('USER_OFFLINE',      applyPresenceEvent);
+  socket.on('USER_AWAY',         applyPresenceEvent);
+  socket.on('PRESENCE_UPDATED',  applyPresenceEvent);
 
   socket.on('call:ended', (data: CallEndedEvent) => {
     const state = get(activeCallStore);

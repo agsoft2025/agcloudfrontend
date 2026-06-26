@@ -22,6 +22,9 @@
   let selectedContactId: string | null = null;
   let selectedContact: UserProfile | null = null;
 
+  /** Mobile-only tab: 'contacts' | 'calls' */
+  let activeTab: 'contacts' | 'calls' = 'contacts';
+
   async function handleCall(contact: UserProfile, callType: 'audio' | 'video') {
     try {
       const response = await initiateCall({
@@ -66,7 +69,7 @@
   <!-- Column 1: Contact list -->
   <section
     class="col-contacts"
-    class:col-hidden-mobile={!!selectedContactId}
+    class:col-hidden-mobile={!!selectedContactId || activeTab === 'calls'}
     aria-label="Contacts"
   >
     <ContactList
@@ -82,7 +85,7 @@
       class="mobile-back"
       type="button"
       aria-label="Back to contacts"
-      on:click={() => { selectedContactId = null; selectedContact = null; }}
+      on:click={() => { selectedContactId = null; selectedContact = null; activeTab = 'contacts'; }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"
@@ -102,9 +105,47 @@
   </section>
 
   <!-- Column 3: Recent call history -->
-  <section class="col-history" aria-label="Recent calls">
+  <section
+    class="col-history"
+    class:col-visible-mobile={activeTab === 'calls' && !selectedContactId}
+    aria-label="Recent calls"
+  >
     <RecentCalls />
   </section>
+
+  <!-- Mobile bottom tab bar (hidden on desktop) -->
+  {#if !selectedContactId}
+    <nav class="mobile-tabs" aria-label="Main navigation">
+      <button
+        class="tab-btn"
+        class:tab-active={activeTab === 'contacts'}
+        type="button"
+        aria-label="Contacts"
+        on:click={() => { activeTab = 'contacts'; }}
+      >
+        <!-- Person icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Contacts</span>
+      </button>
+
+      <button
+        class="tab-btn"
+        class:tab-active={activeTab === 'calls'}
+        type="button"
+        aria-label="Recent Calls"
+        on:click={() => { activeTab = 'calls'; }}
+      >
+        <!-- Phone icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.35 6.35l.98-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Recent Calls</span>
+      </button>
+    </nav>
+  {/if}
 
 </div>
 
@@ -143,7 +184,8 @@
     border-inline-start: 1px solid var(--color-border);
   }
 
-  .mobile-back { display: none; }
+  .mobile-back  { display: none; }
+  .mobile-tabs  { display: none; }
 
   @media (max-width: 1200px) {
     .col-contacts { inline-size: 18rem; }
@@ -154,13 +196,15 @@
     .dashboard {
       flex-direction: column;
       overflow-y: auto;
+      /* leave room at the bottom for the tab bar */
+      padding-block-end: 3.5rem;
     }
 
     .col-contacts {
       inline-size: 100%;
       flex-shrink: 0;
       block-size: auto;
-      min-block-size: 100%;
+      min-block-size: calc(100% - 3.5rem);
     }
 
     .col-contacts.col-hidden-mobile { display: none; }
@@ -168,12 +212,25 @@
     .col-detail {
       flex: none;
       block-size: auto;
-      min-block-size: 100%;
+      min-block-size: calc(100% - 3.5rem);
       display: none;
     }
 
     .col-detail.col-visible-mobile { display: flex; }
 
+    /* Recent calls on mobile: hidden by default, shown via tab */
+    .col-history {
+      display: none;
+      inline-size: 100%;
+      flex-shrink: 0;
+      block-size: auto;
+      min-block-size: calc(100% - 3.5rem);
+      border-inline-start: none;
+    }
+
+    .col-history.col-visible-mobile { display: flex; }
+
+    /* ── Back button ── */
     .mobile-back {
       display: flex;
       align-items: center;
@@ -197,6 +254,45 @@
     .mobile-back:focus-visible {
       outline: 2px solid var(--color-secondary);
       outline-offset: 2px;
+    }
+
+    /* ── Bottom tab bar ── */
+    .mobile-tabs {
+      display: flex;
+      position: fixed;
+      inset-block-end: 0;
+      inset-inline-start: 0;
+      inset-inline-end: 0;
+      block-size: 3.5rem;
+      background: var(--color-surface);
+      border-block-start: 1px solid var(--color-border);
+      z-index: 50;
+    }
+
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      border: none;
+      background: transparent;
+      color: var(--color-text-secondary, #888);
+      font-family: var(--font-sans);
+      font-size: 0.7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+
+    .tab-btn.tab-active {
+      color: var(--color-secondary);
+    }
+
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--color-secondary);
+      outline-offset: -2px;
     }
   }
 </style>

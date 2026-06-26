@@ -748,9 +748,19 @@
     }
   }
 
+  /* Below 900px the panel is hidden by default; the parent page controls
+     visibility via .col-visible-mobile so mobile tabs can show it. */
   @media (max-width: 900px) {
     .rc-panel {
       display: none;
+      inline-size: 100%;
+      border-inline-start: none;
+      border-block-start: 1px solid var(--color-border);
+    }
+
+    /* Shown when parent gives it the mobile-visible class */
+    :global(.col-visible-mobile) .rc-panel {
+      display: flex;
     }
   }
 </style>
