@@ -6,13 +6,13 @@
   Listens for real-time call signaling (via $lib/realtime/call-signaling)
   and drives the activeCallStore state machine:
 
-    idle -> outgoing-ringing  (caller initiates a call, see placeCall())
+    idle -> outgoing-ringing  (caller initiates a call)
     idle -> incoming-ringing  (callee receives "call:incoming")
     outgoing-ringing -> connecting -> in-call  (callee accepted)
     incoming-ringing -> in-call                (callee accepts)
     * -> idle                                  (rejected / cancelled / ended)
 
-  Renders the Teams-style IncomingCallOverlay, a "Calling…" overlay for
+  Renders the Teams-style IncomingCallOverlay, a "Calling..." overlay for
   the caller, and the full CallSession meeting UI once connected.
 -->
 <script lang="ts">
@@ -20,6 +20,7 @@
   import { get } from 'svelte/store';
   import { authStore } from '$lib/stores/auth.store';
   import { activeCallStore, type ActiveCallState } from '$lib/stores/active-call.store';
+  import { presenceStore } from '$lib/stores/presence.store';
   import { initCallSignaling, teardownCallSignaling } from '$lib/realtime/call-signaling';
   import { startRingback, startRingtone, stopRingtone } from '$lib/realtime/ringtone';
   import {
@@ -44,6 +45,13 @@
 
   $: state = $activeCallStore;
   $: handlePhaseChange(state);
+
+  // Callee presence -- used to show offline/ringing status on outgoing call screen
+  $: calleePresence = state.peer
+    ? $presenceStore.presences.get(state.peer.id)
+    : undefined;
+
+  $: calleeStatus = calleePresence?.status ?? 'unknown';
 
   // Hide the banner for whichever invite is already driving the full-screen
   // incoming-call overlay, to avoid showing duplicate UI for the same call.
@@ -191,11 +199,9 @@
   }
 
   // ── Notification banner actions ──────────────────────────────────
-  /** Join a call from the persistent notification banner (new invite, re-invite, or "Call in Progress"). */
   async function handleJoinInvite(invite: IncomingInvite) {
     const current = get(activeCallStore);
 
-    // If we're on a different call already, leave it first.
     if (current.phase !== 'idle' && current.callId !== invite.callId) {
       if (current.phase === 'in-call' || current.phase === 'connecting') {
         if (current.callId) {
@@ -238,7 +244,6 @@
     }
   }
 
-  /** Dismiss a notification banner (declines the invitation; it can be re-sent later). */
   async function handleDismissInvite(invite: IncomingInvite) {
     if (invite.status !== 'ended') {
       try {
@@ -278,16 +283,44 @@
 {:else if state.phase === 'outgoing-ringing' && state.peer}
   <div class="gcm-outgoing" role="dialog" aria-modal="true" aria-label="Outgoing call">
     <div class="gcm-outgoing-card">
-      <div class="gcm-avatar" aria-hidden="true">
+
+      <!-- Avatar with pulse ring (suppressed when offline) -->
+      <div class="gcm-avatar" class:gcm-avatar--offline={calleeStatus === 'offline'} aria-hidden="true">
         {#if state.peer.avatarUrl}
           <img src={state.peer.avatarUrl} alt="" />
         {:else}
           <span>{state.peer.name.slice(0, 1).toUpperCase()}</span>
         {/if}
-        <span class="gcm-pulse"></span>
+        {#if calleeStatus !== 'offline'}
+          <span class="gcm-pulse"></span>
+        {/if}
       </div>
-      <p class="gcm-calling">Calling {state.peer.name}…</p>
-      <p class="gcm-ringing">Ringing</p>
+
+      <!-- Name -->
+      <p class="gcm-name">{state.peer.name}</p>
+
+      <!-- Status line: offline warning | ringing dots | calling -->
+      {#if calleeStatus === 'offline'}
+        <div class="gcm-status gcm-status--offline" role="alert">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="16" r="1" fill="currentColor"/>
+          </svg>
+          <span>{state.peer.name} is offline — they may not receive your call</span>
+        </div>
+        <p class="gcm-substatus">Calling…</p>
+      {:else if calleeStatus === 'online'}
+        <div class="gcm-status gcm-status--ringing">
+          <span>Ringing</span>
+          <span class="gcm-dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+      {:else}
+        <p class="gcm-substatus">Calling…</p>
+      {/if}
+
       <button type="button" class="gcm-cancel" onclick={handleCancelOutgoing}>
         End call
       </button>
@@ -319,9 +352,11 @@
     border: 1px solid var(--color-border);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
     text-align: center;
-    min-inline-size: 18rem;
+    min-inline-size: 20rem;
+    max-inline-size: 24rem;
   }
 
+  /* Avatar */
   .gcm-avatar {
     position: relative;
     inline-size: 5rem;
@@ -336,12 +371,18 @@
     overflow: hidden;
   }
 
+  .gcm-avatar--offline {
+    filter: grayscale(0.6);
+    opacity: 0.8;
+  }
+
   .gcm-avatar img {
     inline-size: 100%;
     block-size: 100%;
     object-fit: cover;
   }
 
+  /* Pulse ring -- only shown when online */
   .gcm-pulse {
     position: absolute;
     inset: -8px;
@@ -351,11 +392,12 @@
   }
 
   @keyframes gcm-pulse {
-    0% { transform: scale(1); opacity: 0.7; }
+    0%   { transform: scale(1);    opacity: 0.7; }
     100% { transform: scale(1.35); opacity: 0; }
   }
 
-  .gcm-calling {
+  /* Peer name */
+  .gcm-name {
     margin: 0;
     font-size: 1.0625rem;
     font-weight: 700;
@@ -363,15 +405,72 @@
     font-family: var(--font-sans);
   }
 
-  .gcm-ringing {
+  /* Status row (shared) */
+  .gcm-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    font-family: var(--font-sans);
+    font-weight: 500;
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+  }
+
+  /* Offline warning badge */
+  .gcm-status--offline {
+    background: rgba(234, 88, 12, 0.12);
+    color: #ea580c;
+    border: 1px solid rgba(234, 88, 12, 0.28);
+    font-size: 0.75rem;
+    border-radius: 8px;
+    text-align: start;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* Ringing badge */
+  .gcm-status--ringing {
+    background: rgba(34, 197, 94, 0.1);
+    color: #16a34a;
+    border: 1px solid rgba(34, 197, 94, 0.25);
+  }
+
+  /* Sub-status text (Calling... shown below offline badge) */
+  .gcm-substatus {
     margin: 0;
     font-size: 0.8125rem;
     color: var(--color-muted);
     font-family: var(--font-sans);
   }
 
+  /* Animated bouncing dots for Ringing */
+  .gcm-dots {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .gcm-dots span {
+    display: block;
+    inline-size: 4px;
+    block-size: 4px;
+    border-radius: 999px;
+    background: currentColor;
+    animation: gcm-dot-bounce 1.2s ease-in-out infinite;
+  }
+
+  .gcm-dots span:nth-child(1) { animation-delay: 0s; }
+  .gcm-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .gcm-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes gcm-dot-bounce {
+    0%, 80%, 100% { transform: translateY(0);    opacity: 0.4; }
+    40%            { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* End call button */
   .gcm-cancel {
-    margin-block-start: 1rem;
+    margin-block-start: 0.5rem;
     padding: 0.625rem 1.5rem;
     border: none;
     border-radius: 999px;

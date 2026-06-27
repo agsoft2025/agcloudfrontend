@@ -1,6 +1,5 @@
 <!--
-  /home — Contact Dashboard
-  =========================
+  /home -- Contact Dashboard
   Sidebar and mobile topbar are provided by home/+layout.svelte.
   This page fills the <slot /> with three content columns:
     [ContactList] [ContactDetail] [RecentCalls]
@@ -18,6 +17,7 @@
   } from '$lib/api/calls.api';
   import type { UserProfile } from '$lib/stores/user.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
+  import { contactsDrawerOpen } from '$lib/stores/contacts-drawer.store';
 
   let selectedContactId: string | null = null;
   let selectedContact: UserProfile | null = null;
@@ -66,10 +66,11 @@
 
 <div class="dashboard" aria-label="Contact dashboard">
 
-  <!-- Column 1: Contact list -->
+  <!-- Column 1: Contact list (drawer) -->
   <section
     class="col-contacts"
     class:col-hidden-mobile={!!selectedContactId || activeTab === 'calls'}
+    class:drawer-closed={!$contactsDrawerOpen}
     aria-label="Contacts"
   >
     <ContactList
@@ -123,7 +124,6 @@
         aria-label="Contacts"
         on:click={() => { activeTab = 'contacts'; }}
       >
-        <!-- Person icon -->
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
           <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -138,7 +138,6 @@
         aria-label="Recent Calls"
         on:click={() => { activeTab = 'calls'; }}
       >
-        <!-- Phone icon -->
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.35 6.35l.98-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -165,6 +164,17 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Drawer slide animation */
+    transition: inline-size 300ms ease, opacity 220ms ease, min-inline-size 300ms ease;
+  }
+
+  /* Drawer closed: collapses width to 0 with fade */
+  .col-contacts.drawer-closed {
+    inline-size: 0;
+    min-inline-size: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
   }
 
   .col-detail {
@@ -189,6 +199,7 @@
 
   @media (max-width: 1200px) {
     .col-contacts { inline-size: 18rem; }
+    .col-contacts.drawer-closed { inline-size: 0; min-inline-size: 0; }
     .col-history  { display: none; }
   }
 
@@ -196,7 +207,6 @@
     .dashboard {
       flex-direction: column;
       overflow-y: auto;
-      /* leave room at the bottom for the tab bar */
       padding-block-end: 3.5rem;
     }
 
@@ -218,7 +228,7 @@
 
     .col-detail.col-visible-mobile { display: flex; }
 
-    /* Recent calls on mobile: hidden by default, shown via tab */
+    /* Recent calls on mobile */
     .col-history {
       display: none;
       inline-size: 100%;
@@ -230,7 +240,7 @@
 
     .col-history.col-visible-mobile { display: flex; }
 
-    /* ── Back button ── */
+    /* Back button */
     .mobile-back {
       display: flex;
       align-items: center;
@@ -256,7 +266,7 @@
       outline-offset: 2px;
     }
 
-    /* ── Bottom tab bar ── */
+    /* Bottom tab bar */
     .mobile-tabs {
       display: flex;
       position: fixed;
