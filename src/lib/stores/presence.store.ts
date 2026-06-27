@@ -44,7 +44,7 @@ export interface PresenceState {
 
 // ── Constants ─────────────────────────────────────────────────────
 
-export const DEFAULT_POLL_INTERVAL_MS = 30_000; // 30 s
+export const DEFAULT_POLL_INTERVAL_MS = 15_000; // 15 s
 
 // ── Status normalisation ──────────────────────────────────────────
 

@@ -5,7 +5,8 @@
   import Button from '$lib/components/atoms/Button.svelte';
   import Input from '$lib/components/atoms/Input.svelte';
   import PasswordStrength from '$lib/components/atoms/PasswordStrength.svelte';
-  import { getAuthErrorMessage, hasAuthToken, signIn, signUp, storeAuthTokens } from '$lib/api/auth.api';
+  import { getAuthErrorMessage, signIn, signUp } from '$lib/api/auth.api';
+  import { authStore } from '$lib/stores/auth.store';
 
   const signupSchema = z.object({
     displayName: z.string().trim().min(1, 'Display name is required.'),
@@ -42,12 +43,9 @@
     isSubmitting = true;
     try {
       await signUp(payload);
-      const data = await signIn({ email: payload.email, password: payload.password });
-      if (!hasAuthToken(data)) {
-        serverError = 'Account created, but the API did not return a session token. Calls cannot be started until the backend returns token or accessToken from /auth/signin.';
-        return;
-      }
-      storeAuthTokens(data);
+      await signIn({ email: payload.email, password: payload.password });
+      // Backend sets the HttpOnly cookie; verify it by calling /auth/me
+      await authStore.initialize();
       await goto('/home');
     } catch (error) {
       serverError = getAuthErrorMessage(error, 'Unable to create your account. Please try again.');

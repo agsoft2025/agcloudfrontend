@@ -1,18 +1,11 @@
 <!--
-  /home — Contact Dashboard
-  Four-column desktop layout:
-    [HomeSidebar] [ContactList] [ContactDetail] [RecentCalls]
-
-  Desktop  : all four columns visible simultaneously
-  Tablet   : sidebar + contacts + detail (history hidden)
-  Mobile   : stacked; back button toggles between list and detail
+  /home -- Contact Dashboard
+  Sidebar and mobile topbar are provided by home/+layout.svelte.
+  This page fills the <slot /> with three content columns:
+    [ContactList] [ContactDetail] [RecentCalls]
 -->
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import HomeSidebar, {
-    type HomeSection,
-    type HomeSidebarItem
-  } from '$lib/components/home/HomeSidebar.svelte';
   import ContactList from '$lib/components/home/ContactList.svelte';
   import ContactDetail from '$lib/components/home/ContactDetail.svelte';
   import RecentCalls from '$lib/components/home/RecentCalls.svelte';
@@ -24,20 +17,14 @@
   } from '$lib/api/calls.api';
   import type { UserProfile } from '$lib/stores/user.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
+  import { contactsDrawerOpen } from '$lib/stores/contacts-drawer.store';
 
-  // Sidebar nav items
-  const sidebarItems: HomeSidebarItem[] = [
-    { id: 'contact', label: 'Contacts', description: 'View and call your contacts' }
-  ];
-
-  let selectedSection: HomeSection = 'contact';
-  let mobileNavOpen = false;
-
-  // Contact selection — bound from ContactList
   let selectedContactId: string | null = null;
   let selectedContact: UserProfile | null = null;
 
-  // Call initiation
+  /** Mobile-only tab: 'contacts' | 'calls' */
+  let activeTab: 'contacts' | 'calls' = 'contacts';
+
   async function handleCall(contact: UserProfile, callType: 'audio' | 'video') {
     try {
       const response = await initiateCall({
@@ -63,7 +50,6 @@
           : null
       });
 
-      // Navigate to the dedicated call page when credentials are available
       if (hasLiveKitCredentials(response)) {
         await goto(`/call/${encodeURIComponent(response.roomName)}`);
       }
@@ -78,154 +64,92 @@
   <meta name="description" content="View and call your AG Cloud contacts." />
 </svelte:head>
 
-<div class="app-layout">
-  <!-- Left sidebar nav -->
-  <HomeSidebar
-    items={sidebarItems}
-    bind:selected={selectedSection}
-    bind:mobileOpen={mobileNavOpen}
-  />
+<div class="dashboard" aria-label="Contact dashboard">
 
-  <!-- Content shell -->
-  <div class="content-shell">
-    <!-- Mobile top bar -->
-    <header class="topbar" aria-label="Mobile navigation">
+  <!-- Column 1: Contact list (drawer) -->
+  <section
+    class="col-contacts"
+    class:col-hidden-mobile={!!selectedContactId || activeTab === 'calls'}
+    class:drawer-closed={!$contactsDrawerOpen}
+    aria-label="Contacts"
+  >
+    <ContactList
+      bind:selectedId={selectedContactId}
+      bind:selectedContact={selectedContact}
+      onCallContact={handleCall}
+    />
+  </section>
+
+  <!-- Mobile back button -->
+  {#if selectedContactId}
+    <button
+      class="mobile-back"
+      type="button"
+      aria-label="Back to contacts"
+      on:click={() => { selectedContactId = null; selectedContact = null; activeTab = 'contacts'; }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Back
+    </button>
+  {/if}
+
+  <!-- Column 2: Contact detail -->
+  <section
+    class="col-detail"
+    class:col-visible-mobile={!!selectedContactId}
+    aria-label="Contact details"
+  >
+    <ContactDetail contact={selectedContact} onCall={handleCall} />
+  </section>
+
+  <!-- Column 3: Recent call history -->
+  <section
+    class="col-history"
+    class:col-visible-mobile={activeTab === 'calls' && !selectedContactId}
+    aria-label="Recent calls"
+  >
+    <RecentCalls />
+  </section>
+
+  <!-- Mobile bottom tab bar (hidden on desktop) -->
+  {#if !selectedContactId}
+    <nav class="mobile-tabs" aria-label="Main navigation">
       <button
-        class="hamburger"
+        class="tab-btn"
+        class:tab-active={activeTab === 'contacts'}
         type="button"
-        aria-label="Open navigation"
-        aria-expanded={mobileNavOpen}
-        aria-controls="app-sidebar"
-        on:click={() => (mobileNavOpen = true)}
-      >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="M3 5h14M3 10h14M3 15h14"
-            stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <div class="topbar-brand">
-        <span>AG Cloud</span>
-      </div>
-      <div style="inline-size: 2.25rem;" aria-hidden="true"></div>
-    </header>
-
-    <!-- Four-column dashboard -->
-    <div class="dashboard" aria-label="Contact dashboard">
-
-      <!-- Column 1: Contact list -->
-      <section
-        class="col-contacts"
-        class:col-hidden-mobile={!!selectedContactId}
         aria-label="Contacts"
+        on:click={() => { activeTab = 'contacts'; }}
       >
-        <ContactList
-          bind:selectedId={selectedContactId}
-          bind:selectedContact={selectedContact}
-          onCallContact={handleCall}
-        />
-      </section>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Contacts</span>
+      </button>
 
-      <!-- Mobile back button -->
-      {#if selectedContactId}
-        <button
-          class="mobile-back"
-          type="button"
-          aria-label="Back to contacts"
-          on:click={() => { selectedContactId = null; selectedContact = null; }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Back
-        </button>
-      {/if}
-
-      <!-- Column 2: Contact detail -->
-      <section
-        class="col-detail"
-        class:col-visible-mobile={!!selectedContactId}
-        aria-label="Contact details"
+      <button
+        class="tab-btn"
+        class:tab-active={activeTab === 'calls'}
+        type="button"
+        aria-label="Recent Calls"
+        on:click={() => { activeTab = 'calls'; }}
       >
-        <ContactDetail
-          contact={selectedContact}
-          onCall={handleCall}
-        />
-      </section>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.72 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.63 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.35 6.35l.98-.97a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.03z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Recent Calls</span>
+      </button>
+    </nav>
+  {/if}
 
-      <!-- Column 3: Recent call history -->
-      <section class="col-history" aria-label="Recent calls">
-        <RecentCalls />
-      </section>
-
-    </div>
-  </div>
 </div>
 
 <style lang="postcss">
-  /* ── Root layout ─────────────────────────────────────────── */
-  .app-layout {
-    display: flex;
-    block-size: 100dvh;
-    overflow: hidden;
-  }
-
-  .content-shell {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-inline-size: 0;
-    overflow: hidden;
-  }
-
-  /* ── Mobile top bar ────────────────────────────────────── */
-  .topbar {
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: var(--color-surface);
-    border-block-end: 1px solid var(--color-border);
-    flex-shrink: 0;
-    z-index: 10;
-    box-shadow: var(--shadow-xs);
-  }
-
-  .hamburger {
-    display: grid;
-    place-items: center;
-    inline-size: 2.25rem;
-    block-size: 2.25rem;
-    border: 1.5px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--color-text);
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
-    transition: background-color 140ms ease, border-color 140ms ease;
-  }
-
-  .hamburger:hover {
-    background: var(--color-surface-raised);
-    border-color: var(--color-border-strong);
-  }
-
-  .hamburger:focus-visible {
-    outline: 2px solid var(--color-secondary);
-    outline-offset: 1px;
-  }
-
-  .topbar-brand {
-    color: var(--color-primary);
-    font-family: var(--font-sans);
-    font-size: 0.9375rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  /* ── Dashboard: 3-column flex row ─────────────────────── */
+  /* Dashboard fills the flex content-shell provided by the layout */
   .dashboard {
     flex: 1;
     min-block-size: 0;
@@ -234,16 +158,25 @@
     position: relative;
   }
 
-  /* Column 1: Contact list — fixed width */
   .col-contacts {
     inline-size: 22rem;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    /* Drawer slide animation */
+    transition: inline-size 300ms ease, opacity 220ms ease, min-inline-size 300ms ease;
   }
 
-  /* Column 2: Contact detail — flexible */
+  /* Drawer closed: collapses width to 0 with fade */
+  .col-contacts.drawer-closed {
+    inline-size: 0;
+    min-inline-size: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
   .col-detail {
     flex: 1;
     min-inline-size: 0;
@@ -252,7 +185,6 @@
     overflow: hidden;
   }
 
-  /* Column 3: Recent calls — fixed width */
   .col-history {
     inline-size: 22rem;
     flex-shrink: 0;
@@ -262,29 +194,27 @@
     border-inline-start: 1px solid var(--color-border);
   }
 
-  /* Mobile back button — hidden on desktop */
-  .mobile-back { display: none; }
+  .mobile-back  { display: none; }
+  .mobile-tabs  { display: none; }
 
-  /* ── Tablet ─────────────────────────────────────────────── */
   @media (max-width: 1200px) {
     .col-contacts { inline-size: 18rem; }
+    .col-contacts.drawer-closed { inline-size: 0; min-inline-size: 0; }
     .col-history  { display: none; }
   }
 
-  /* ── Mobile ─────────────────────────────────────────────── */
   @media (max-width: 800px) {
-    .topbar { display: flex; }
-
     .dashboard {
       flex-direction: column;
       overflow-y: auto;
+      padding-block-end: 3.5rem;
     }
 
     .col-contacts {
       inline-size: 100%;
       flex-shrink: 0;
       block-size: auto;
-      min-block-size: 100%;
+      min-block-size: calc(100% - 3.5rem);
     }
 
     .col-contacts.col-hidden-mobile { display: none; }
@@ -292,12 +222,25 @@
     .col-detail {
       flex: none;
       block-size: auto;
-      min-block-size: 100%;
+      min-block-size: calc(100% - 3.5rem);
       display: none;
     }
 
     .col-detail.col-visible-mobile { display: flex; }
 
+    /* Recent calls on mobile */
+    .col-history {
+      display: none;
+      inline-size: 100%;
+      flex-shrink: 0;
+      block-size: auto;
+      min-block-size: calc(100% - 3.5rem);
+      border-inline-start: none;
+    }
+
+    .col-history.col-visible-mobile { display: flex; }
+
+    /* Back button */
     .mobile-back {
       display: flex;
       align-items: center;
@@ -321,6 +264,45 @@
     .mobile-back:focus-visible {
       outline: 2px solid var(--color-secondary);
       outline-offset: 2px;
+    }
+
+    /* Bottom tab bar */
+    .mobile-tabs {
+      display: flex;
+      position: fixed;
+      inset-block-end: 0;
+      inset-inline-start: 0;
+      inset-inline-end: 0;
+      block-size: 3.5rem;
+      background: var(--color-surface);
+      border-block-start: 1px solid var(--color-border);
+      z-index: 50;
+    }
+
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      border: none;
+      background: transparent;
+      color: var(--color-text-secondary, #888);
+      font-family: var(--font-sans);
+      font-size: 0.7rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+
+    .tab-btn.tab-active {
+      color: var(--color-secondary);
+    }
+
+    .tab-btn:focus-visible {
+      outline: 2px solid var(--color-secondary);
+      outline-offset: -2px;
     }
   }
 </style>
