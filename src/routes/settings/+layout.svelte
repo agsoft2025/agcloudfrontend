@@ -46,7 +46,9 @@
         <div style="inline-size: 2.25rem;" aria-hidden="true"></div>
       </header>
 
-      <slot />
+      <div class="page-scroll">
+        <slot />
+      </div>
     </div>
   </div>
 {/if}
@@ -63,7 +65,16 @@
     flex-direction: column;
     flex: 1;
     min-inline-size: 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    /* vertical scroll is handled by .page-scroll child */
+  }
+
+  /* Scrollable content region — sits between the fixed topbar and the edge */
+  .page-scroll {
+    flex: 1;
+    min-block-size: 0;      /* allows flex child to shrink below content size */
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .topbar {
