@@ -1832,10 +1832,6 @@
     color: #f87171;
   }
 
-  /* Disabled-feature state */
-  .ctrl-btn.ctrl-disabled-feature {
-    opacity: 0.3;
-  }
 
   /* End call — red pill, larger */
   .ctrl-btn.ctrl-end {
