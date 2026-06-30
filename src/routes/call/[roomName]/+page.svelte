@@ -15,8 +15,9 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { ConnectionQuality, ConnectionState } from 'livekit-client';
+  import { ConnectionQuality, ConnectionState, Track } from 'livekit-client';
 
+  import LiveKitTrack from '$lib/components/calls/LiveKitTrack.svelte';
   import VideoTile from '$lib/components/molecules/VideoTile.svelte';
   import CallControls from '$lib/components/molecules/CallControls.svelte';
   import ParticipantList from '$lib/components/molecules/ParticipantList.svelte';
@@ -54,6 +55,13 @@
 
   $: localParticipant = callState.localParticipant;
   $: remoteParticipants = callState.remoteParticipants;
+
+  // Remote audio tracks — rendered as hidden <audio> elements so User1 can hear User2
+  $: remoteAudioTracks = remoteParticipants.flatMap((p) =>
+    p.tracks
+      .filter((t) => t.kind === Track.Kind.Audio && t.track)
+      .map((t) => ({ id: t.sid, participant: p.name ?? p.identity, track: t.track }))
+  );
 
   // All participants in display order: local first, then remote
   $: allParticipants = [
@@ -234,6 +242,13 @@
     </div>
 
   {:else}
+    <!-- ── Hidden audio sink: plays remote participants' audio for User1 ── -->
+    <div aria-hidden="true" style="display:none">
+      {#each remoteAudioTracks as item (item.id)}
+        <LiveKitTrack track={item.track} label="{item.participant} audio" />
+      {/each}
+    </div>
+
     <!-- ── Main call workspace ──────────────────────────────── -->
     <div class="call-workspace">
 
