@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
-import { apiFetch } from '$lib/api/client';
+import { apiGet } from '$lib/api/client';
 
 export interface AuthUser {
   id: string;
@@ -29,19 +29,14 @@ function createAuthStore() {
 
   /**
    * Verify session with the server via GET /auth/me (cookie sent automatically).
-   * Uses apiFetch so URL construction goes through joinUrl — no double-slash
-   * issues regardless of whether VITE_API_BASE_URL has a trailing slash.
+   * apiGet throws ApiError on non-2xx (401, 500, etc.) and AbortError on timeout,
+   * all of which land in the catch block and result in the unauthenticated state.
    */
   async function initialize() {
     if (!browser) return;
     try {
-      const response = await apiFetch('/auth/me');
-      if (response.ok) {
-        const user = (await response.json()) as AuthUser;
-        set({ user, isAuthenticated: true, isInitialized: true });
-      } else {
-        set({ user: null, isAuthenticated: false, isInitialized: true });
-      }
+      const user = await apiGet<AuthUser>('/auth/me');
+      set({ user, isAuthenticated: true, isInitialized: true });
     } catch {
       set({ user: null, isAuthenticated: false, isInitialized: true });
     }

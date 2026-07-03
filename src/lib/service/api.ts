@@ -4,6 +4,12 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface CallApiOptions extends Omit<RequestInit, 'body' | 'method'> {
   method?: HttpMethod;
+  /**
+   * Per-request timeout override (milliseconds).
+   * Passed through to the underlying apiFetch; defaults to the client's
+   * 30-second global timeout. Pass `0` to disable for this call.
+   */
+  timeoutMs?: number;
 }
 
 interface ApiErrorBody {
@@ -16,7 +22,8 @@ export async function callApi<TResponse = unknown, TBody = unknown>(
   body?: TBody,
   options: CallApiOptions = {}
 ): Promise<TResponse> {
-  const headers = new Headers(options.headers);
+  const { timeoutMs, ...restOptions } = options;
+  const headers = new Headers(restOptions.headers);
 
   headers.set('Accept', headers.get('Accept') ?? 'application/json');
 
@@ -25,11 +32,11 @@ export async function callApi<TResponse = unknown, TBody = unknown>(
   }
 
   const response = await apiFetch(path, {
-    ...options,
-    method: options.method ?? 'POST',
+    ...restOptions,
+    method: restOptions.method ?? 'POST',
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: options.credentials ?? 'include'
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
   });
 
   if (!response.ok) {

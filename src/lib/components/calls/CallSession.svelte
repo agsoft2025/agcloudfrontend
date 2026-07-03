@@ -18,6 +18,7 @@
     Track,
     VideoQuality,
   } from "livekit-client";
+
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import { fade, scale } from "svelte/transition";
   import { callStore } from "$lib/stores/call.store";
@@ -187,6 +188,9 @@
   // ── Media toggle state ─────────────────────────────
   let isTogglingAudio = false;
   let isTogglingVideo = false;
+  /** Track which camera is active on mobile; true = front (selfie), false = rear */
+  let isFrontCamera = true;
+  let isSwitchingCamera = false;
   let controlError = "";
 
   // ── Elapsed call timer ─────────────────────────────
@@ -347,6 +351,28 @@
       controlError = getMediaControlError(e, "camera");
     } finally {
       isTogglingVideo = false;
+    }
+  }
+
+  /**
+   * Switch between front (selfie) and rear camera without ending the call.
+   * Only meaningful on mobile devices that have both cameras.
+   * Uses LiveKit's restartTrack() to re-acquire the camera with the new facingMode
+   * and seamlessly republish the updated stream to remote participants.
+   */
+  async function switchCamera() {
+    if (isSwitchingCamera || !isConnected || !isCameraEnabled) return;
+    isSwitchingCamera = true;
+    controlError = "";
+    const nextFacing = isFrontCamera ? "environment" : "user";
+    try {
+      await liveKitClient.setCameraFacingMode(nextFacing);
+      isFrontCamera = !isFrontCamera;
+      if ($callStore.room) callStore.syncRoom($callStore.room);
+    } catch (e) {
+      controlError = "Unable to switch camera.";
+    } finally {
+      isSwitchingCamera = false;
     }
   }
 
@@ -850,7 +876,17 @@
   {/if}
 
   <!-- ── Bottom controls bar ─────────────────────── -->
+  <!--
+    .controls-inner uses width:max-content + margin-inline:auto to fix the
+    classic justify-content:center + overflow-x:auto clipping bug:
+    When buttons overflow the bar, centering would push the start of the flex
+    content past the left viewport edge, making Mic/Camera unreachable.
+    width:max-content makes the inner as wide as its content; margin-inline:auto
+    centers it when it fits and becomes a no-op when it overflows, so scroll
+    always starts from the left (Mic visible first).
+  -->
   <div class="controls-bar" aria-label="Meeting controls">
+    <div class="controls-inner">
     <!-- Left group -->
     <div class="ctrl-group">
       <!-- Mic -->
@@ -962,6 +998,25 @@
           </svg>
         {/if}
         <span>{isCameraEnabled ? "Cam off" : "Cam on"}</span>
+      </button>
+
+      <!-- Switch camera — only useful on mobile; hidden via CSS on desktop -->
+      <button
+        type="button"
+        class="ctrl-btn ctrl-flip"
+        disabled={!isConnected || !isCameraEnabled || isSwitchingCamera}
+        aria-label={isFrontCamera ? "Switch to rear camera" : "Switch to front camera"}
+        title={isFrontCamera ? "Use rear camera" : "Use front camera"}
+        on:click={switchCamera}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20 7h-3.5L15 5H9L7.5 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="13" r="3" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 3l2-2 2 2M14 3l-2 2-2-2"
+            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Flip</span>
       </button>
     </div>
 
@@ -1213,6 +1268,7 @@
         <span>{isFullscreen ? "Exit" : "Full"}</span>
       </button>
     </div>
+    </div><!-- /controls-inner -->
   </div>
 
   <!-- ── Add people modal ────────────────────────────── -->
@@ -1735,18 +1791,33 @@
   }
 
   /* ── Controls bar ────────────────────────────────── */
+  /*
+   * .controls-bar: provides background, border, and clips the scrollable inner.
+   *   No overflow here — overflow is handled by .controls-inner.
+   *
+   * .controls-inner: the scrollable flex row.
+   *   width:max-content → always exactly as wide as its buttons.
+   *   margin-inline:auto → centers it when the bar is wider (desktop).
+   *   When the bar is narrower (mobile overflow), auto margins become 0 and
+   *   content starts from the LEFT edge — Mic & Camera are the first visible
+   *   buttons, which is the correct scroll start position.
+   */
   .controls-bar {
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 0.625rem 1.5rem 0.875rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
     background: rgba(10, 15, 26, 0.92);
     border-block-start: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
-    overflow-x: auto;
-    scrollbar-width: thin;
+  }
+
+  .controls-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.625rem 1.5rem 0.875rem;
+    width: max-content;
+    margin-inline: auto;
   }
 
   .ctrl-group {
@@ -2175,7 +2246,8 @@
       max-inline-size: 100%;
     }
 
-    .controls-bar {
+    /* controls-inner overrides on mobile: tighter gap and padding */
+    .controls-inner {
       gap: 0.375rem;
       padding: 0.5rem 0.75rem 0.75rem;
     }
@@ -2185,6 +2257,7 @@
       padding: 0.625rem;
     }
 
+    /* Hide text labels on mobile — icons only to save space */
     .ctrl-btn span {
       display: none;
     }
@@ -2196,6 +2269,14 @@
     .waiting-overlay {
       inset-inline-end: 0.5rem;
       inset-block-end: 5rem;
+    }
+  }
+
+  /* Switch-camera button: only useful on mobile (touchscreen devices with
+     multiple cameras). Hidden on desktop where facingMode is not applicable. */
+  @media (min-width: 641px) {
+    .ctrl-flip {
+      display: none;
     }
   }
 
