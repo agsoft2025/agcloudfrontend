@@ -141,9 +141,10 @@ export class LiveKitClient {
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
-      videoCaptureDefaults: {
-        resolution: { width: 1280, height: 720, frameRate: 30 }
-      },
+      // videoCaptureDefaults: no hardcoded resolution — the browser captures at the
+      // device's natural orientation (portrait on phones held upright, landscape on
+      // desktops). Forcing 1280×720 here causes severe portrait-mode cropping on mobile
+      // because the constraint tells getUserMedia to crop the camera frame to landscape.
       publishDefaults: {
         videoEncoding: { maxBitrate: 2_000_000, maxFramerate: 30 },
         screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 15 },
@@ -213,13 +214,17 @@ export class LiveKitClient {
     return this.requireRoom().localParticipant.setMicrophoneEnabled(enabled);
   }
 
-  async setCameraEnabled(enabled: boolean): Promise<LocalTrackPublication | undefined> {
+  async setCameraEnabled(
+    enabled: boolean,
+    captureOptions: { facingMode?: 'user' | 'environment' } = {}
+  ): Promise<LocalTrackPublication | undefined> {
     try {
+      // No hardcoded resolution in capture options — forces landscape on mobile.
+      // Let the device camera capture at its natural aspect ratio; LiveKit's
+      // adaptiveStream + dynacast handle quality scaling from there.
       return await this.requireRoom().localParticipant.setCameraEnabled(
         enabled,
-        {
-          resolution: { width: 1280, height: 720, frameRate: 30 }
-        },
+        captureOptions.facingMode ? { facingMode: captureOptions.facingMode } : {},
         {
           videoCodec: 'vp8',
           simulcast: true,
@@ -233,6 +238,19 @@ export class LiveKitClient {
       }
       throw e;
     }
+  }
+
+  /**
+   * Switch between front (user) and rear (environment) camera without ending the call.
+   * Calls LocalVideoTrack.restartTrack() which re-acquires the camera with new constraints
+   * and seamlessly republishes the updated track to remote participants.
+   */
+  async setCameraFacingMode(facing: 'user' | 'environment'): Promise<void> {
+    const pub = this.requireRoom().localParticipant.getTrackPublication(Track.Source.Camera);
+    const track = pub?.videoTrack;
+    if (!track) return; // camera not active
+    // restartTrack re-acquires with new MediaTrackConstraints
+    await track.restartTrack({ facingMode: facing });
   }
 
   async setScreenShareEnabled(enabled: boolean): Promise<LocalTrackPublication | undefined> {

@@ -128,30 +128,48 @@
   </div>
 
   <footer class="sidebar-footer">
+    <!--
+      Two-row layout:
+        Row 1 — user-card (full width): avatar + name/plan.
+                 Full inner width (~238 px) means even long names like
+                 "Ajayanand Gummi" fit without being clipped.
+        Row 2 — footer-controls: ThemeToggle + logout, right-aligned.
+                 Keeping controls on their own row ensures the logout button
+                 is always visible — it can never be pushed off-screen by
+                 a long name in the same horizontal row.
+      padding-block-end uses env(safe-area-inset-bottom) so the logout button
+      is never hidden behind the iOS home-indicator bar on iPhone X+.
+    -->
     <div class="user-card">
       <div class="user-avatar-wrap" aria-hidden="true">
         <span class="user-avatar">{getInitials(user)}</span>
         <span class="user-online-dot"></span>
       </div>
       <div class="user-meta">
-        <strong class="user-name">{getDisplayName(user)}</strong>
+        <!--
+          title gives a tooltip on hover so the full name is always
+          accessible even when ellipsis kicks in for very long names.
+        -->
+        <strong class="user-name" title={getDisplayName(user)}>{getDisplayName(user)}</strong>
         <small class="user-plan">{getPlanLabel(user)}</small>
       </div>
     </div>
-    <ThemeToggle size="sm" />
-    <button
-      class="logout-btn"
-      type="button"
-      aria-label="Log out"
-      title="Log out"
-      disabled={isLoggingOut}
-      on:click={handleLogout}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
-          stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
+    <div class="footer-controls">
+      <ThemeToggle size="sm" />
+      <button
+        class="logout-btn"
+        type="button"
+        aria-label="Log out"
+        title="Log out"
+        disabled={isLoggingOut}
+        on:click={handleLogout}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
+            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
   </footer>
 </aside>
 
@@ -168,13 +186,35 @@
     flex-shrink: 0;
     background: var(--sidebar-bg);
     border-inline-end: 1px solid var(--sidebar-border);
-    overflow: hidden;
+    /*
+     * Split overflow axes:
+     *   overflow-x: hidden — clips content that bleeds past the sidebar edge
+     *     (important during the transform: translateX slide animation on mobile).
+     *   overflow-y: auto   — lets the sidebar scroll if its flex children are
+     *     ever taller than the computed sidebar height. Without this, a height
+     *     mismatch between block-size: 100dvh and the actual visual viewport
+     *     (common on iOS Safari when browser chrome is visible) causes
+     *     overflow: hidden to silently clip .sidebar-footer — hiding the logout
+     *     button and theme toggle. overflow-y: auto makes that scenario
+     *     scrollable instead of invisibly truncated.
+     *
+     * Note: .sidebar-main already has overflow-y: auto, so in normal operation
+     * only .sidebar-main scrolls; .sidebar itself only scrolls as a last resort.
+     */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .sidebar-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 39;
+    /*
+     * z-index: 59 — must be above the mobile bottom-tab bar (z-index: 50 in
+     * home/+page.svelte) and below the sidebar itself (60).
+     * When the sidebar drawer is open the dim overlay should cover the tab bar,
+     * giving the correct modal-drawer feel on mobile.
+     */
+    z-index: 59;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
     animation: fade-in 200ms ease both;
@@ -192,6 +232,13 @@
     gap: 0.75rem;
     flex-shrink: 0;
     padding: 0.5rem 1rem 0;
+    /*
+     * With viewport-fit=cover the top of the sidebar can be behind the iOS
+     * status bar / notch / Dynamic Island. env(safe-area-inset-top) gives
+     * us the exact pixel clearance needed; max() keeps at least 0.5rem of
+     * padding on devices without a notch (where the env value is 0).
+     */
+    padding-block-start: max(0.5rem, env(safe-area-inset-top));
   }
 
   .brand { display: flex; align-items: center; min-inline-size: 0; }
@@ -246,12 +293,30 @@
     margin-inline: 0.25rem;
   }
 
+  /*
+   * Sidebar footer: column layout (user-card row, then controls row).
+   *
+   * WHY COLUMN:
+   *   Previously a single horizontal row: [user-card flex:1] [theme] [logout].
+   *   The user-card only received ~164 px — not enough for names like
+   *   "Ajayanand Gummi" (~121 px at 14 px/700 weight), causing ellipsis.
+   *   The logout button was also the LAST element in the row, so on iOS
+   *   devices without env(safe-area-inset-bottom) it sat inside the home-
+   *   indicator safe zone and appeared hidden.
+   *
+   *   With a column layout:
+   *   • user-card gets the full inner width (~238 px) → no name truncation.
+   *   • footer-controls sit on their own row, right-aligned, always visible.
+   *   • padding-block-end via max() ensures the row clears the iOS home bar.
+   */
   .sidebar-footer {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 0.5rem;
     flex-shrink: 0;
-    padding: 0.875rem 1rem 1.125rem;
+    padding: 0.875rem 1rem;
+    /* iOS safe-area: ensure controls are above the home-indicator bar */
+    padding-block-end: max(1.125rem, env(safe-area-inset-bottom));
     border-block-start: 1px solid var(--sidebar-border);
     background: color-mix(in srgb, var(--sidebar-bg) 80%, transparent);
     backdrop-filter: blur(8px);
@@ -261,7 +326,8 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    flex: 1;
+    /* flex: 1 removed — in column footer each child stretches to full width
+       automatically; no need to grow in the block direction */
     min-inline-size: 0;
   }
 
@@ -291,7 +357,9 @@
     letter-spacing: 0.02em;
   }
 
-  .user-meta { display: grid; gap: 0.1rem; min-inline-size: 0; }
+  /* flex: 1 lets user-meta fill all horizontal space in user-card after the
+     avatar, giving names the maximum room before ellipsis triggers. */
+  .user-meta { flex: 1; display: grid; gap: 0.1rem; min-inline-size: 0; }
 
   .user-name {
     margin: 0;
@@ -332,14 +400,42 @@
   .logout-btn:focus-visible { outline: 2px solid var(--color-secondary); outline-offset: 2px; }
   .logout-btn:disabled { cursor: wait; opacity: 0.6; }
 
+  /* Footer controls: theme toggle + logout, pushed to the right */
+  .footer-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.375rem;
+  }
+
   @media (min-width: 801px) { .close-btn { display: none; } }
 
   @media (max-width: 800px) {
     .sidebar {
       position: fixed;
       inset-block: 0;
+      /*
+       * CRITICAL: reset block-size so inset-block:0 (top:0; bottom:0) fully
+       * controls the sidebar height on mobile instead of the desktop 100dvh.
+       *
+       * Without this override the base block-size:100dvh value is still active.
+       * Per CSS spec, when top + height + bottom are all set on a fixed element
+       * the bottom constraint is auto-resolved — so block-size:100dvh wins over
+       * inset-block-end:0. On iOS Safari / some Android browsers, 100dvh ≠ true
+       * visual-viewport height, causing a height mismatch that silently clips
+       * the sidebar footer behind overflow-x:hidden.
+       *
+       * With block-size:auto and inset-block:0, the sidebar stretches between
+       * top:0 and bottom:0 — always exactly the visual viewport height.
+       */
+      block-size: auto;
       inset-inline-start: 0;
-      z-index: 40;
+      /*
+       * z-index: 60 — the mobile bottom-tab bar (home/+page.svelte) uses 50.
+       * The sidebar must sit above it so the footer (logout + theme toggle)
+       * is not covered when the drawer is open.
+       */
+      z-index: 60;
       transform: translateX(-100%);
       transition: transform var(--sidebar-transition), box-shadow var(--sidebar-transition);
       box-shadow: none;
