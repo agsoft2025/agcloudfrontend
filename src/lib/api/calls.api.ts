@@ -22,6 +22,8 @@ export interface CallSummary {
   callType?: CallType;
   status?: string;
   createdAt?: string;
+  endedAt?: string;
+  updatedAt?: string;
 }
 
 export interface InitiateCallResponse {
@@ -57,7 +59,7 @@ export interface AddParticipantResponse {
   [key: string]: unknown;
 }
 
-// ── API calls ──────────────────────────────────────────────────────────────────
+// ── API calls ────────────────────────────────────────────────────────────────────────────────
 
 export async function initiateCall(payload: InitiateCallPayload): Promise<InitiateCallResponse> {
   return apiPost<InitiateCallResponse>('/calls/initiate', payload);
@@ -94,7 +96,7 @@ export async function stopRecording(callId: string): Promise<AcceptCallResponse>
   return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/stop`);
 }
 
-// ── Response helpers ───────────────────────────────────────────────────────────
+// ── Response helpers ──────────────────────────────────────────────────────────────────────────────────────
 
 export function getCallIdentifier(
   response: InitiateCallResponse | AcceptCallResponse | RejectCallResponse | EndCallResponse

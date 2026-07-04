@@ -97,7 +97,6 @@ function parsePresenceResponse(data: unknown): Map<string, UserPresence> {
       const entry = item as Record<string, unknown>;
       if (typeof entry.userId !== 'string') continue;
 
-      console.debug('[presence] array item:', entry.userId, entry.status);
       map.set(entry.userId, {
         userId: entry.userId,
         status: normalizeStatus(entry.status),
@@ -114,7 +113,6 @@ function parsePresenceResponse(data: unknown): Map<string, UserPresence> {
     // Single presence object: { userId: "...", status: "online", ... }
     // Detected by the presence of a string "userId" field at the root.
     if (typeof obj.userId === 'string') {
-      console.debug('[presence] single object:', obj.userId, obj.status);
       map.set(obj.userId, {
         userId: obj.userId,
         status: normalizeStatus(obj.status),
@@ -127,7 +125,6 @@ function parsePresenceResponse(data: unknown): Map<string, UserPresence> {
     for (const [userId, value] of Object.entries(obj)) {
       if (value == null || typeof value !== 'object') continue;
       const entry = value as Record<string, unknown>;
-      console.debug('[presence] dict entry:', userId, entry.status);
       map.set(userId, {
         userId,
         status: normalizeStatus(entry.status),
@@ -162,10 +159,8 @@ function createPresenceStore(defaultIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
 
     try {
       const data = await apiGet<unknown>('/users/presence');
-      console.debug('[presence] raw API response:', data);
 
       const presences = parsePresenceResponse(data);
-      console.debug('[presence] parsed entries:', presences.size);
 
       update((s) => ({
         ...s,
@@ -211,7 +206,6 @@ function createPresenceStore(defaultIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
       status: normalizeStatus(presence.status),
       lastSeen: presence.lastSeen,
     };
-    console.debug('[presence] setPresence (socket):', normalised.userId, normalised.status);
     update((s) => {
       const presences = new Map(s.presences);
       presences.set(normalised.userId, normalised);

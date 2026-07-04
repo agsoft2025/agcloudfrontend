@@ -232,3 +232,168 @@ async function networkFirst(request: Request): Promise<Response> {
     return new Response(null, { status: 503, statusText: 'Service Unavailable' });
   }
 }
+
+// ── Push notifications ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Metadata carried by an incoming-call push notification.
+ *
+ * Backends may send the payload in two shapes:
+ *   • Flat:  { title, body, callId, callerName, … }
+ *   • FCM:   { notification: { title, body }, data: { callId, callerName, … } }
+ * Both are normalised into this type before the notification is shown.
+ */
+interface CallPushData {
+  /** Notification title (e.g. "Incoming call from Alice"). */
+  title?: string;
+  /** Notification body (e.g. "Alice is calling you"). */
+  body?: string;
+  /** Opaque call ID — passed to accept/reject API endpoints. */
+  callId?: string;
+  /** Unique identity of the caller. */
+  callerId?: string;
+  /** Display name shown prominently in the notification. */
+  callerName?: string;
+  /** 'audio' | 'video' */
+  callType?: string;
+  /** LiveKit room name — used to build the /call/:roomName URL on click. */
+  roomName?: string;
+  /** Direct URL to open when the user taps the notification (optional). */
+  meetingUrl?: string;
+  /** Deduplication tag — prevents stacking multiple call notifications. */
+  tag?: string;
+  /** Icon URL override (falls back to /favicon.png). */
+  icon?: string;
+  /** Resolved URL opened on notification click — computed in handlePush. */
+  url?: string;
+}
+
+/** Safely coerce an unknown value to string; returns undefined for nullish. */
+function safeString(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  return String(v);
+}
+
+/**
+ * Parse an incoming push payload into a CallPushData object.
+ *
+ * Accepts both flat and FCM-style ({ notification, data }) payloads.
+ * Always returns a valid object — never throws.
+ */
+function parsePushPayload(raw: Record<string, unknown>): CallPushData {
+  // FCM wraps notification fields under "notification" and custom data under "data".
+  const notif =
+    raw['notification'] !== null &&
+    typeof raw['notification'] === 'object'
+      ? (raw['notification'] as Record<string, unknown>)
+      : {};
+
+  const data =
+    raw['data'] !== null &&
+    typeof raw['data'] === 'object'
+      ? (raw['data'] as Record<string, unknown>)
+      : raw; // flat payload — treat the whole object as data
+
+  return {
+    title:      safeString(notif['title']      ?? data['title']),
+    body:       safeString(notif['body']       ?? data['body']),
+    callId:     safeString(data['callId']),
+    callerId:   safeString(data['callerId']),
+    callerName: safeString(data['callerName']),
+    callType:   safeString(data['callType']),
+    roomName:   safeString(data['roomName']),
+    meetingUrl: safeString(data['meetingUrl']),
+    tag:        safeString(data['tag']),
+    icon:       safeString(data['icon']),
+  };
+}
+
+/**
+ * Handle an incoming push event:
+ *   1. Parse the payload (safely — bad payloads show a generic notification).
+ *   2. Build notification options from the call metadata.
+ *   3. Show the notification via self.registration.showNotification().
+ */
+async function handlePush(event: PushEvent): Promise<void> {
+  let payload: CallPushData = {};
+
+  try {
+    if (event.data) {
+      const raw = event.data.json() as Record<string, unknown>;
+      payload = parsePushPayload(raw);
+    }
+  } catch (err) {
+    // Malformed JSON — log for debugging but still show a generic notification.
+    console.error('[SW] Failed to parse push payload:', err);
+  }
+
+  const callerName = payload.callerName || 'Someone';
+  const callType   = payload.callType === 'video' ? 'Video' : 'Audio';
+  const title      = payload.title || `${callType} call from ${callerName}`;
+  const body       = payload.body  || `${callerName} is calling you`;
+  const tag        = payload.tag   || `incoming-call-${payload.callId ?? Date.now()}`;
+  const icon       = payload.icon  || '/favicon.png';
+
+  // Resolve the URL that notificationclick will open.
+  const url =
+    payload.meetingUrl ??
+    (payload.roomName ? `/call/${encodeURIComponent(payload.roomName)}` : '/');
+
+  // Store all call metadata in data so notificationclick can forward it to
+  // the app client (e.g. to trigger the in-app IncomingCallOverlay).
+  const notificationData: CallPushData = { ...payload, url };
+
+  await self.registration.showNotification(title, {
+    body,
+    icon,
+    badge:              '/favicon.png',
+    tag,
+    renotify:           true,  // re-alert even if a notification with the same tag exists
+    requireInteraction: true,  // keep the notification on-screen until the user acts
+    vibrate:            [200, 100, 200, 100, 200], // three pulses — standard call pattern
+    timestamp:          Date.now(),
+    data:               notificationData,
+  } as NotificationOptions);
+}
+
+self.addEventListener('push', (event: PushEvent) => {
+  event.waitUntil(handlePush(event));
+});
+
+// ── Notification click ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Handle a click on a push notification:
+ *   1. Close the notification immediately.
+ *   2. Focus an existing app window and forward the call metadata, OR
+ *   3. Open a new window at the call/app URL if no window is open.
+ */
+async function handleNotificationClick(notification: Notification): Promise<void> {
+  notification.close();
+
+  const data = notification.data as CallPushData | null;
+  const url  = data?.url ?? '/';
+
+  // Look for any open window controlled by this service worker.
+  const windowClients = await self.clients.matchAll({
+    type:                'window',
+    includeUncontrolled: true,
+  });
+
+  for (const client of windowClients) {
+    // Forward the call metadata so the app can display IncomingCallOverlay.
+    client.postMessage({ type: 'incoming-call-notification', data });
+
+    if ('focus' in client) {
+      await (client as WindowClient).focus();
+      return;
+    }
+  }
+
+  // No open window — open the app at the call URL.
+  await self.clients.openWindow(url);
+}
+
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
+  event.waitUntil(handleNotificationClick(event.notification));
+});

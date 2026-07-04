@@ -107,7 +107,6 @@
       const room = await liveKitClient.connect({
         token: liveKit.token,
         url: liveKit.url,
-        roomOptions: { adaptiveStream: false, dynacast: false },
         connectOptions: { autoSubscribe: true }
       });
 
