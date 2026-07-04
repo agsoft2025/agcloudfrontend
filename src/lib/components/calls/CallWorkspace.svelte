@@ -89,7 +89,6 @@
     const room = await liveKitClient.connect({
       token: response.token,
       url: response.url,
-      roomOptions: { adaptiveStream: false, dynacast: false },
       connectOptions: { autoSubscribe: true }
     });
     cleanupCallEvents = bindCallEvents(room);

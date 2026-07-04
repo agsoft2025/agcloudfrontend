@@ -26,6 +26,7 @@
   import { getContacts } from "$lib/api/contacts.api";
   import { addParticipant, getCallApiErrorMessage } from "$lib/api/calls.api";
   import { authStore } from "$lib/stores/auth.store";
+  import { toastStore } from "$lib/stores/toast.store";
   import { callLifecycleEvents } from "$lib/realtime/call-signaling";
   import type { UserProfile } from "$lib/stores/user.store";
   import LiveKitTrack from "./LiveKitTrack.svelte";
@@ -232,7 +233,7 @@
       });
     });
     if (tracksToRecord.length === 0) {
-      alert("No active media tracks found to record.");
+      toastStore.error("No active media tracks found to record.");
       return;
     }
     const stream = new MediaStream(tracksToRecord);

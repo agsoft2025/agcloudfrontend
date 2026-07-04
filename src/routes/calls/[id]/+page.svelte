@@ -76,7 +76,16 @@
     if (!call.createdAt) return 'N/A';
     const startMs = new Date(call.createdAt).getTime();
     if (isNaN(startMs)) return 'N/A';
-    const endTs = call.status === 'ended' || call.status === 'active' ? Date.now() : Date.now();
+    // Active calls use the current time so the duration ticks in real time.
+    // Ended/missed/rejected calls use the recorded end timestamp so duration
+    // remains fixed after the call completes; fall back to updatedAt, then
+    // Date.now() only if neither timestamp is available.
+    const isActive = call.status === 'active';
+    const endTs = isActive
+      ? Date.now()
+      : (call.endedAt ? new Date(call.endedAt).getTime() : null)
+          ?? (call.updatedAt ? new Date(call.updatedAt).getTime() : null)
+          ?? Date.now();
     const secs = Math.floor((endTs - startMs) / 1000);
     if (secs < 60) return `${secs}s`;
     const mins = Math.floor(secs / 60);
