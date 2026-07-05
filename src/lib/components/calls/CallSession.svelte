@@ -76,6 +76,14 @@
     isTogglingScreenShare = true;
     controlError = "";
     try {
+      if (!isScreenSharing && remoteIsSharing) {
+        // Warn that taking over will interrupt the current presenter.
+        // The mutual-exclusion logic in useCall.ts will stop the remote share
+        // once we publish ours, but we want the local user to be aware.
+        toastStore.info(
+          `${screenSharerName ?? "Another participant"} was presenting. Taking over screen share.`,
+        );
+      }
       await liveKitClient.setScreenShareEnabled(!isScreenSharing);
       if ($callStore.room) callStore.syncRoom($callStore.room);
     } catch (e) {
@@ -500,6 +508,23 @@
 
   $: isScreenSharing = Boolean(localScreenShareTrack);
 
+  // Who is currently presenting (identity string or null).
+  // Used to drive the "X is presenting" banner and the takeover warning.
+  $: screenSharerIdentity = $callStore.screenShareParticipantIdentity;
+  $: screenSharerName = (() => {
+    if (!screenSharerIdentity) return null;
+    const localId = $callStore.localParticipant?.identity;
+    if (screenSharerIdentity === localId) return 'You';
+    const remote = $callStore.remoteParticipants.find(
+      (p) => p.identity === screenSharerIdentity
+    );
+    return remote?.name ?? remote?.identity ?? screenSharerIdentity;
+  })();
+  // True when a different participant (not us) is sharing.
+  $: remoteIsSharing =
+    Boolean(screenSharerIdentity) &&
+    screenSharerIdentity !== $callStore.localParticipant?.identity;
+
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
   $: totalParticipants = allTiles.length;
   $: gridCols =
@@ -749,6 +774,31 @@
     {#if isSpotlight && pinnedTile}
       <!-- ── Spotlight layout: main tile + thumbnail strip ── -->
       <div class="spotlight-layout">
+        {#if mainIsScreenShare && screenSharerName}
+          <div class="presenter-banner" aria-live="polite">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M8 20h8M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>{screenSharerName} is presenting</span>
+            {#if !isScreenSharing}
+              <button
+                type="button"
+                class="presenter-stop-btn"
+                on:click={toggleScreenShare}
+                title="Share your screen instead"
+              >Share instead</button>
+            {:else}
+              <button
+                type="button"
+                class="presenter-stop-btn presenter-stop-btn--active"
+                on:click={toggleScreenShare}
+                title="Stop sharing"
+              >Stop sharing</button>
+            {/if}
+          </div>
+        {/if}
         <div class="spotlight-main" in:fade={{ duration: 220 }}>
           <ParticipantTile
             track={mainTrack}
@@ -777,6 +827,15 @@
                 in:scale={{ duration: 200, start: 0.85 }}
                 out:fade={{ duration: 150 }}
               >
+                {#if tile.screenShareTrack}
+                  <div class="thumbnail-screen-share-badge" aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2.5"/>
+                      <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Sharing
+                  </div>
+                {/if}
                 <ParticipantTile
                   track={tile.videoTrack}
                   name={tile.name}
@@ -2287,4 +2346,89 @@
       grid-template-columns: repeat(2, 1fr) !important;
     }
   }
+  /* ── Presenter banner (shown above spotlight when screen sharing) ── */
+  .presenter-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    background: rgba(78, 135, 255, 0.12);
+    border-block-end: 1px solid rgba(78, 135, 255, 0.2);
+    color: #93c5fd;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .presenter-banner svg {
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  .presenter-banner span {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .presenter-stop-btn {
+    flex-shrink: 0;
+    border: 1px solid rgba(78, 135, 255, 0.4);
+    border-radius: 999px;
+    background: rgba(78, 135, 255, 0.15);
+    color: #93c5fd;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.2rem 0.625rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 140ms ease;
+  }
+
+  .presenter-stop-btn:hover {
+    background: rgba(78, 135, 255, 0.28);
+  }
+
+  .presenter-stop-btn--active {
+    border-color: rgba(220, 38, 38, 0.4);
+    background: rgba(220, 38, 38, 0.12);
+    color: #fca5a5;
+  }
+
+  .presenter-stop-btn--active:hover {
+    background: rgba(220, 38, 38, 0.22);
+  }
+
+  /* ── Thumbnail screen-share badge ─────────────────────────────── */
+  .thumbnail-item {
+    position: relative;
+  }
+
+  .thumbnail-screen-share-badge {
+    position: absolute;
+    inset-block-start: 0.3rem;
+    inset-inline-start: 0.3rem;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(78, 135, 255, 0.75);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.375rem;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+
+  .thumbnail-screen-share-badge svg {
+    stroke: currentColor;
+    flex-shrink: 0;
+  }
+
+
 </style>

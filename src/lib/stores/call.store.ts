@@ -6,7 +6,7 @@ import {
   type RemoteParticipant,
   type RemoteTrackPublication,
   type Room,
-  type Track,
+  Track,
   type TrackPublication
 } from 'livekit-client';
 import { writable } from 'svelte/store';
@@ -44,6 +44,7 @@ export interface CallState {
   remoteParticipants: CallParticipantState[];
   activeSpeakers: string[];
   raisedHands: string[];
+  screenShareParticipantIdentity: string | null;
   error: string | null;
 }
 
@@ -54,6 +55,7 @@ const initialState: CallState = {
   remoteParticipants: [],
   activeSpeakers: [],
   raisedHands: [],
+  screenShareParticipantIdentity: null,
   error: null
 };
 
@@ -124,6 +126,30 @@ function createCallStore() {
 export const callStore = createCallStore();
 
 export function snapshotRoom(room: Room): CallState {
+  // Determine who is currently sharing their screen (at most one at a time).
+  // Remote participants take priority in the search so the viewer's own local
+  // share doesn't mask a remote presenter they should be watching.
+  let screenShareParticipantIdentity: string | null = null;
+
+  for (const participant of room.remoteParticipants.values()) {
+    for (const pub of participant.getTrackPublications()) {
+      if (pub.source === Track.Source.ScreenShare && pub.track && !pub.isMuted) {
+        screenShareParticipantIdentity = participant.identity;
+        break;
+      }
+    }
+    if (screenShareParticipantIdentity) break;
+  }
+
+  if (!screenShareParticipantIdentity) {
+    for (const pub of room.localParticipant.getTrackPublications()) {
+      if (pub.source === Track.Source.ScreenShare && pub.track && !pub.isMuted) {
+        screenShareParticipantIdentity = room.localParticipant.identity;
+        break;
+      }
+    }
+  }
+
   return {
     room,
     connectionState: room.state,
@@ -133,6 +159,7 @@ export function snapshotRoom(room: Room): CallState {
     ),
     activeSpeakers: room.activeSpeakers.map((participant) => participant.identity),
     raisedHands: [],
+    screenShareParticipantIdentity,
     error: null
   };
 }
