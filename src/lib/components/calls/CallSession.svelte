@@ -776,12 +776,14 @@
       <div class="spotlight-layout">
         {#if mainIsScreenShare && screenSharerName}
           <div class="presenter-banner" aria-live="polite">
+          <div>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
               <path d="M8 20h8M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span>{screenSharerName} is presenting</span>
+          </div>
             {#if !isScreenSharing}
               <button
                 type="button"
@@ -2349,6 +2351,8 @@
   /* ── Presenter banner (shown above spotlight when screen sharing) ── */
   .presenter-banner {
     display: flex;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
     gap: 0.5rem;
     padding: 0.375rem 0.875rem;

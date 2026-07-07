@@ -1,28 +1,29 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import LiveKitTrack from './LiveKitTrack.svelte';
-  import type { Track } from 'livekit-client';
+  import { createEventDispatcher } from "svelte";
+  import LiveKitTrack from "./LiveKitTrack.svelte";
+  import type { Track } from "livekit-client";
 
   export let track: Track | undefined = undefined;
   export let name: string;
   export let label: string;
-  export let isActive = false;   // speaking / active speaker
-  export let isMuted = false;    // microphone muted
+  export let isActive = false; // speaking / active speaker
+  export let isMuted = false; // microphone muted
   export let isCameraOff = false;
   export let mirror = false;
   export let isLocal = false;
   export let isPinned = false;
   export let isHandRaised = false;
-  export let networkQuality: 'excellent' | 'good' | 'poor' | undefined = undefined;
+  export let networkQuality: "excellent" | "good" | "poor" | undefined =
+    undefined;
   export let isScreenShare = false;
 
   const dispatch = createEventDispatcher<{ togglePin: void }>();
 
   function getInitials(n: string): string {
     return n
-      .split(' ')
-      .map((part) => part[0] ?? '')
-      .join('')
+      .split(" ")
+      .map((part) => part[0] ?? "")
+      .join("")
       .slice(0, 2)
       .toUpperCase();
   }
@@ -41,9 +42,9 @@
   $: showVideo = !!track && !isCameraOff;
 
   const NETWORK_LABEL: Record<string, string> = {
-    excellent: 'Excellent connection',
-    good: 'Good connection',
-    poor: 'Poor connection'
+    excellent: "Excellent connection",
+    good: "Good connection",
+    poor: "Poor connection",
   };
 </script>
 
@@ -53,7 +54,9 @@
   class:cam-off={!showVideo}
   class:pinned={isPinned}
   class:screen-share={isScreenShare}
-  aria-label="{name}{isActive ? ' — speaking' : ''}{isPinned ? ' — pinned' : ''}"
+  aria-label="{name}{isActive ? ' — speaking' : ''}{isPinned
+    ? ' — pinned'
+    : ''}"
 >
   <!-- Video -->
   {#if showVideo}
@@ -80,17 +83,33 @@
     class:is-pinned={isPinned}
     aria-pressed={isPinned}
     aria-label={isPinned ? `Unpin ${name}` : `Pin ${name}`}
-    title={isPinned ? 'Unpin' : 'Pin'}
-    on:click|stopPropagation={() => dispatch('togglePin')}
+    title={isPinned ? "Unpin" : "Pin"}
+    on:click|stopPropagation={() => dispatch("togglePin")}
   >
     {#if isPinned}
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M16 3l5 5-4 4 1 5-4-4-5 5-1-1 5-5-4-4 5-1 4-4z"/>
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M16 3l5 5-4 4 1 5-4-4-5 5-1-1 5-5-4-4 5-1 4-4z" />
       </svg>
     {:else}
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M16 3l5 5-4 4 1 5-4-4-5 5-1-1 5-5-4-4 5-1 4-4z"
-          stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M16 3l5 5-4 4 1 5-4-4-5 5-1-1 5-5-4-4 5-1 4-4z"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linejoin="round"
+        />
       </svg>
     {/if}
   </button>
@@ -99,18 +118,42 @@
   <div class="tile-top-badges" aria-hidden="true">
     {#if isHandRaised}
       <span class="badge-pill badge-hand" title="Hand raised">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 11.5V4.5a1.5 1.5 0 013 0v6M12 10.5V3a1.5 1.5 0 013 0v7.5M15 10.5V5a1.5 1.5 0 013 0v9a6 6 0 01-6 6h-1a6 6 0 01-5-2.7L4 13.8a1.4 1.4 0 012.3-1.6L8 14"
-            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M9 11.5V4.5a1.5 1.5 0 013 0v6M12 10.5V3a1.5 1.5 0 013 0v7.5M15 10.5V5a1.5 1.5 0 013 0v9a6 6 0 01-6 6h-1a6 6 0 01-5-2.7L4 13.8a1.4 1.4 0 012.3-1.6L8 14"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </span>
     {/if}
 
-    {#if networkQuality === 'poor'}
-      <span class="badge-pill badge-network badge-network-poor" title={NETWORK_LABEL.poor}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2v-12h-2v12zm5 0h2V4h-2v16z" fill="currentColor" opacity="0.35"/>
-          <path d="M2 20h2v-4H2v4z" fill="currentColor"/>
+    {#if networkQuality === "poor"}
+      <span
+        class="badge-pill badge-network badge-network-poor"
+        title={NETWORK_LABEL.poor}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2v-12h-2v12zm5 0h2V4h-2v16z"
+            fill="currentColor"
+            opacity="0.35"
+          />
+          <path d="M2 20h2v-4H2v4z" fill="currentColor" />
         </svg>
       </span>
     {/if}
@@ -118,34 +161,99 @@
 
   <!-- Bottom info overlay -->
   <div class="tile-footer">
-    <span class="tile-name">{name}{isLocal ? ' (you)' : ''}</span>
+    <span class="tile-name">{name}{isLocal ? " (you)" : ""}</span>
 
     <span class="tile-icons">
-      {#if networkQuality && networkQuality !== 'poor'}
-        <span class="status-icon icon-network" title={NETWORK_LABEL[networkQuality]} aria-label={NETWORK_LABEL[networkQuality]}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2v-12h-2v12zm5 0h2V4h-2v16z" fill="currentColor"
-              opacity={networkQuality === 'excellent' ? '1' : '0.6'}/>
+      {#if networkQuality && networkQuality !== "poor"}
+        <span
+          class="status-icon icon-network"
+          title={NETWORK_LABEL[networkQuality]}
+          aria-label={NETWORK_LABEL[networkQuality]}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2v-12h-2v12zm5 0h2V4h-2v16z"
+              fill="currentColor"
+              opacity={networkQuality === "excellent" ? "1" : "0.6"}
+            />
           </svg>
         </span>
       {/if}
 
       {#if isCameraOff}
-        <span class="status-icon icon-cam-off" aria-label="{name} camera off" title="Camera off">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M2 8a2 2 0 012-2h2M2 12v4a2 2 0 002 2h9"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <span
+          class="status-icon icon-cam-off"
+          aria-label="{name} camera off"
+          title="Camera off"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M2 8a2 2 0 012-2h2M2 12v4a2 2 0 002 2h9"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <line
+              x1="2"
+              y1="2"
+              x2="22"
+              y2="22"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
           </svg>
         </span>
       {/if}
 
       {#if isMuted}
-        <span class="status-icon icon-muted" aria-label="{name} microphone muted" title="Microphone muted">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v4M8 23h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <span
+          class="status-icon icon-muted"
+          aria-label="{name} microphone muted"
+          title="Microphone muted"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <line
+              x1="1"
+              y1="1"
+              x2="23"
+              y2="23"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+            <path
+              d="M9 9v3a3 3 0 005.12 2.12M15 9.34V5a3 3 0 00-5.94-.6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v4M8 23h8"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </span>
       {/if}
@@ -239,18 +347,35 @@
     inset-block-start: 0.5rem;
     inset-inline-end: 0.5rem;
     z-index: 3;
-    display: grid;
-    place-items: center;
-    inline-size: 1.75rem;
-    block-size: 1.75rem;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 2.75rem; /* Increased */
+    height: 2.75rem; /* Increased */
+
     border: none;
-    border-radius: 999px;
+    border-radius: 50%;
     background: rgba(10, 15, 26, 0.55);
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
+
     opacity: 0;
     transform: scale(0.85);
-    transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease, color 160ms ease;
+    transition:
+      opacity 160ms ease,
+      transform 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
+
+    padding: 0; /* Remove default padding */
+  }
+
+  .pin-btn svg {
+    width: 24px;
+    height: 24px;
+    display: block;
   }
 
   .tile:hover .pin-btn,
@@ -297,9 +422,16 @@
   }
 
   @keyframes hand-wave {
-    0%, 100% { transform: rotate(0deg); }
-    25%       { transform: rotate(-12deg); }
-    75%       { transform: rotate(12deg); }
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(-12deg);
+    }
+    75% {
+      transform: rotate(12deg);
+    }
   }
 
   .badge-network-poor {
@@ -379,18 +511,32 @@
   }
 
   @keyframes speaker-shimmer {
-    0%, 100% { opacity: 0.78; }
-    50%      { opacity: 1; }
+    0%,
+    100% {
+      opacity: 0.78;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
   /* Hide labels at very small tile sizes */
   @container (max-width: 140px) {
-    .tile-name { font-size: 0.6875rem; }
-    .pin-btn { inline-size: 1.5rem; block-size: 1.5rem; }
+    .tile-name {
+      font-size: 0.6875rem;
+    }
+    .pin-btn {
+      inline-size: 1.5rem;
+      block-size: 1.5rem;
+    }
   }
 
   @container (max-width: 100px) {
-    .tile-footer { padding-inline: 0.375rem; }
-    .tile-icons { display: none; }
+    .tile-footer {
+      padding-inline: 0.375rem;
+    }
+    .tile-icons {
+      display: none;
+    }
   }
 </style>
