@@ -26,8 +26,7 @@
   }
 </script>
 
-<div class="room-chip" title="Room ID: {roomId}">
-  <!-- Room icon -->
+<!-- <div class="room-chip" title="Room ID: {roomId}">
   <span class="room-icon" aria-hidden="true">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="4" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -35,10 +34,8 @@
     </svg>
   </span>
 
-  <!-- ID text -->
   <span class="room-id" aria-label="Room ID: {roomId}">{roomId}</span>
 
-  <!-- Copy button -->
   <button
     type="button"
     class="copy-btn"
@@ -48,17 +45,14 @@
     on:click={copyToClipboard}
   >
     {#if copied}
-      <!-- Checkmark -->
       <svg class="icon-check" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
         <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     {:else if copyFailed}
-      <!-- X mark -->
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
         <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
       </svg>
     {:else}
-      <!-- Copy icon -->
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
         <path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -66,7 +60,6 @@
     {/if}
   </button>
 
-  <!-- Tooltip feedback -->
   {#if copied || copyFailed}
     <span
       class="copy-toast"
@@ -78,7 +71,7 @@
       {copied ? 'Copied!' : 'Failed'}
     </span>
   {/if}
-</div>
+</div> -->
 
 <style lang="postcss">
   .room-chip {
