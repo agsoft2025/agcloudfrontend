@@ -60,6 +60,12 @@ interface CallEndedEvent {
   callId: string;
 }
 
+interface CallParticipantLeftEvent {
+  callId: string;
+  userId: string;
+  displayName: string;
+}
+
 interface CallParticipantJoinedEvent {
   callId: string;
   userId: string;
@@ -153,6 +159,13 @@ export function initCallSignaling(): void {
   socket.on('USER_OFFLINE',      applyPresenceEvent);
   socket.on('USER_AWAY',         applyPresenceEvent);
   socket.on('PRESENCE_UPDATED',  applyPresenceEvent);
+
+  // A single participant left; the meeting continues for remaining participants.
+  // The LiveKit ParticipantDisconnected room event already updates the call UI,
+  // so we only need to propagate the lifecycle event here — no store reset.
+  socket.on('call:participant-left', (data: CallParticipantLeftEvent) => {
+    emitLifecycleEvent('call:participant-left', data.callId, data.userId);
+  });
 
   socket.on('call:ended', (data: CallEndedEvent) => {
     const state = get(activeCallStore);

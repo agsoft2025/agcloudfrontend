@@ -1,6 +1,6 @@
 # AG Cloud Frontend — Development Status Report
 
-**Date:** June 30, 2026
+**Date:** June 30, 2026 (updated July 3, 2026)
 **Branch:** `dev`
 **Prepared by:** Claude Code (code review of actual source files)
 **Previous report:** `documents/Frontend-Status-Report.md` (June 14, 2026, by Venkat)
@@ -48,15 +48,15 @@ Significant work has landed on `dev` since the previous report. The most importa
 | `/reset-password` | `routes/reset-password/+page.svelte` | ✅ Done | Token from URL param |
 | `/home` | `routes/home/+page.svelte` | ✅ Done | `CallWorkspace` + `HomeSidebar` shell |
 | `/contacts` | `routes/contacts/+page.svelte` | ✅ Done | Search, presence dots, links to detail |
-| `/contacts/[id]` | `routes/contacts/[id]/+page.svelte` | ✅ Exists | Content needs verification |
+| `/contacts/[id]` | `routes/contacts/[id]/+page.svelte` | ✅ Done | Full profile card: avatar, presence, email, role, video/audio call buttons, block/unblock |
 | `/calls` | `routes/calls/+page.svelte` | ✅ Done | History list with direction/type/duration |
-| `/calls/[id]` | `routes/calls/[id]/+page.svelte` | ✅ Exists | Content needs verification |
+| `/calls/[id]` | `routes/calls/[id]/+page.svelte` | ✅ Done | Call metadata (type/mode/status/room), participant list with presence; `formatDuration` has a dead-branch bug (see P2) |
 | `/call/[roomName]` | `routes/call/[roomName]/+page.svelte` | ✅ Done | Full-screen video grid, participant sidebar, controls bar |
-| `/settings` | `routes/settings/+layout.svelte` | ✅ Exists | |
-| `/settings/profile` | `routes/settings/profile/+page.svelte` | ✅ Exists | |
-| `/settings/devices` | `routes/settings/devices/+page.svelte` | ✅ Exists | |
-| `/settings/notifications` | `routes/settings/notifications/+page.svelte` | ✅ Exists | |
-| `/settings/privacy` | `routes/settings/privacy/+page.svelte` | ✅ Exists | Optimistic unblock wired via `privacyStore` |
+| `/settings` | `routes/settings/+layout.svelte` | ✅ Done | Sidebar nav to all settings sub-pages |
+| `/settings/profile` | `routes/settings/profile/+page.svelte` | ✅ Done | Avatar upload (2 MB limit, blob preview), displayName edit with Zod, read-only email |
+| `/settings/devices` | `routes/settings/devices/+page.svelte` | ✅ Done | Camera preview, live mic level meter (28-segment), speaker test tone, hot-plug, loading skeleton |
+| `/settings/notifications` | `routes/settings/notifications/+page.svelte` | ✅ Done | FCM enable/disable flow; syncs permission state on mount; graceful degradation when FCM not configured |
+| `/settings/privacy` | `routes/settings/privacy/+page.svelte` | ✅ Done | Blocked users list; optimistic unblock + rollback via `privacyStore` |
 | `/offline` | `routes/offline/+page.svelte` | ✅ Exists | (bonus — not in spec) |
 
 > **Note:** `.bak` files remain committed under `src/routes/(auth)/` (4 files). These are not served but add noise to git history and `check` output. Delete them.
@@ -92,8 +92,8 @@ Significant work has landed on `dev` since the previous report. The most importa
 | `userStore` | `stores/user.store.ts` | ✅ Done | Profile cache with localStorage persistence and `hydrateProfile` lazy-loading |
 | `notificationStore` | `stores/notification.store.ts` | ✅ Done | FCM permission state, token management, localStorage persistence |
 | `privacyStore` | `stores/privacy.store.ts` | ✅ Done | Blocked user list with optimistic unblock + rollback |
-| `contactsDrawerStore` | `stores/contacts-drawer.store.ts` | ✅ Exists | (not read in detail) |
-| `devicePreferences` | `stores/device-preferences.ts` | ✅ Exists | (not read in detail) |
+| `contactsDrawerStore` | `stores/contacts-drawer.store.ts` | ✅ Done | Boolean open/close for the contacts drawer on `/home`; imported by `home/+page.svelte` |
+| `devicePreferences` | `stores/device-preferences.ts` | ✅ Done | Persists selected camera/mic/speaker IDs to localStorage; `setCamera/setMicrophone/setSpeaker` helpers; used by `/settings/devices` and `LiveKitClient` |
 
 ---
 
@@ -121,7 +121,8 @@ Significant work has landed on `dev` since the previous report. The most importa
 | `useCall` / `bindCallEvents` | ✅ Done | 16 `RoomEvent` handlers sync to `callStore` |
 | Audio output selection | ✅ Done | `lib/livekit/audio-output.ts` |
 | **adaptiveStream / dynacast** | ⚠️ Bug | `LiveKitClient.connect()` defaults to `true`, but **`GlobalCallManager.svelte` and `CallWorkspace.svelte`** pass `roomOptions: { adaptiveStream: false, dynacast: false }` — overriding the class defaults. These two call sites must remove the override. |
-| Duplicate LiveKit service | ⚠️ Dead code | `src/lib/service/livekit.ts` still exists and duplicates `LiveKitClient.ts`. No route imports it. Delete it. |
+| `lib/service/livekit.ts` | ⚠️ Dead code | Marked `@deprecated` and empty — safe to delete. Only `LiveKitClient.ts` is the canonical implementation. |
+| `lib/service/api.ts` | ✅ In use | Second HTTP wrapper (`callApi`) used exclusively by `LiveKitClient.ts` for the `getLiveKitToken()` POST. Not dead code. |
 | Full-screen `/call/[roomName]` route | ✅ Done | Responsive grid (1→2→3 columns by participant count); desktop sidebar + mobile drawer |
 
 ---
@@ -170,9 +171,8 @@ All planned molecules are built: `Modal`, `Toast`, `VideoTile`, `CallControls`, 
 | # | Issue | Notes |
 |---|---|---|
 | 8 | Store unit tests | `auth.store`, `call.store`, `active-call.store`, `presence.store` all untested |
-| 9 | `/contacts/[id]` and `/calls/[id]` pages | Files exist; detailed content not verified — may need content work |
-| 10 | Settings pages content | Files exist; detailed UX not verified |
-| 11 | Lighthouse / bundle audit | Target: <80 KB initial JS per spec |
+| 9 | **`formatDuration` dead branch in `/calls/[id]`** | `calls/[id]/+page.svelte:79` — `const endTs = call.status === 'ended' \|\| ... ? Date.now() : Date.now()` — both branches return `Date.now()`, so ended calls show time-since-created instead of actual duration. Should use `call.endedAt` or `call.updatedAt` for ended/missed/rejected states. |
+| 10 | Lighthouse / bundle audit | Target: <80 KB initial JS per spec |
 
 ---
 

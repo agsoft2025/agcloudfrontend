@@ -27,6 +27,7 @@
     acceptCall,
     rejectCall,
     endCall,
+    leaveCall,
     hasLiveKitCredentials,
     getCallApiErrorMessage
   } from '$lib/api/calls.api';
@@ -184,13 +185,16 @@
   }
 
   // ── End an active call ──────────────────────────────────────────
+  // Uses leaveCall() instead of endCall() so the meeting stays alive for
+  // remaining participants. endCall() is reserved for the host explicitly
+  // terminating the session for everyone (future "End for all" feature).
   async function handleEndCall() {
     if (!state.callId) return;
     isEndingCall = true;
     try {
-      await endCall(state.callId);
+      await leaveCall(state.callId);
     } catch (err) {
-      console.error('[GlobalCallManager] end call failed:', err);
+      console.error('[GlobalCallManager] leave call failed:', err);
     } finally {
       isEndingCall = false;
       activeCallStore.reset();
@@ -205,7 +209,8 @@
       if (current.phase === 'in-call' || current.phase === 'connecting') {
         if (current.callId) {
           try {
-            await endCall(current.callId);
+            // Leave the current call gracefully — other participants stay in.
+            await leaveCall(current.callId);
           } catch (err) {
             console.error('[GlobalCallManager] failed to leave current call:', err);
           }
@@ -213,6 +218,7 @@
         await cleanupCallSession();
       } else if (current.phase === 'outgoing-ringing' && current.callId) {
         try {
+          // Cancel an unanswered outgoing call — this truly ends it for everyone.
           await endCall(current.callId);
         } catch (err) {
           console.error('[GlobalCallManager] failed to cancel outgoing call:', err);
