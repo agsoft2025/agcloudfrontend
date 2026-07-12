@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
-import { apiGet } from '$lib/api/client';
+import { getProfile } from '$lib/api/user.api';
 import type { AuthUser } from './auth.store';
 
 export interface UserProfile extends AuthUser {
@@ -79,8 +79,11 @@ function persistProfiles(profiles: Map<string, UserProfile>) {
   localStorage.setItem(USER_PROFILE_CACHE_KEY, JSON.stringify(Array.from(profiles.values())));
 }
 
-async function defaultProfileLoader(userId: string) {
-  return apiGet<UserProfile>(`/users/${userId}`);
+// Profile fetching is handled by getProfile() in lib/api/user.api.ts.
+// Keeping this thin alias so hydrateProfile's loader parameter type is satisfied
+// without spreading API-layer logic across store and API modules.
+async function defaultProfileLoader(userId: string): Promise<UserProfile> {
+  return getProfile(userId);
 }
 
 function createUserStore() {
