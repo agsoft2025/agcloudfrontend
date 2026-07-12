@@ -85,7 +85,6 @@ export function initCallSignaling(): void {
   isInitialized = true;
 
   socket.on('call:incoming', (data: IncomingCallEvent) => {
-    console.log('[call-signaling] call:incoming', data);
     const state = get(activeCallStore);
 
     // Always record/refresh the invitation in the persistent notification

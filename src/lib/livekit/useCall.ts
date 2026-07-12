@@ -163,13 +163,6 @@ export function bindCallEvents(room: Room | null): () => void {
   }
 
   function syncRemotePublication(publication: RemoteTrackPublication, _participant: RemoteParticipant) {
-    console.log('Remote track publication changed:', {
-      participant: _participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      subscribed: publication.isSubscribed
-    });
 
     // Mutual exclusion: if a remote participant starts screen sharing while we
     // are also sharing, stop our local share immediately. Only one presenter
@@ -202,12 +195,6 @@ export function bindCallEvents(room: Room | null): () => void {
     participant: RemoteParticipant
   ) {
     publication.setSubscribed(true);
-    console.log('Remote track subscribed:', {
-      participant: participant.identity,
-      kind: track.kind,
-      source: publication.source,
-      sid: publication.trackSid
-    });
     subscribeAndSyncSoon();
   }
 
@@ -216,13 +203,6 @@ export function bindCallEvents(room: Room | null): () => void {
     status: TrackPublication.SubscriptionStatus,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track subscription status changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      status
-    });
     publication.setSubscribed(true);
     subscribeAndSyncSoon();
   }
@@ -232,13 +212,6 @@ export function bindCallEvents(room: Room | null): () => void {
     status: TrackPublication.PermissionStatus,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track subscription permission changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      status
-    });
     publication.setSubscribed(true);
     subscribeAndSyncSoon();
   }
@@ -248,13 +221,6 @@ export function bindCallEvents(room: Room | null): () => void {
     streamState: Track.StreamState,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track stream state changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      streamState
-    });
     sync();
   }
 
@@ -294,7 +260,6 @@ function subscribeToRemotePublications(room: Room, qualityConfiguredSids: Set<st
           publication.setVideoFPS(30);
           qualityConfiguredSids.add(sid);
 
-          console.log('[useCall] Video quality configured for', participant.identity, sid);
         }
       }
     });

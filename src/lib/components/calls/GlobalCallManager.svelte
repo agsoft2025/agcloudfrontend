@@ -62,7 +62,6 @@
 
   onMount(() => {
     if ($authStore.isAuthenticated) {
-      console.log('[GlobalCallManager] initializing call signaling');
       initCallSignaling();
     } else {
       console.warn('[GlobalCallManager] not authenticated at mount, skipping call signaling init');
