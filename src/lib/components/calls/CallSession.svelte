@@ -140,6 +140,10 @@
   // 'rejected'  — person declined (shown briefly, then resets to allow re-invite)
   let inviteStatuses = new Map<string, "inviting" | "invited" | "rejected">();
   let rejectionResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Expiry timers: auto-clear "Invite Sent" if the user never joins/rejects.
+  let inviteTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  // Previous snapshot of remote participant IDs — used to detect departures.
+  let prevRemoteIds = new Set<string>();
 
   // ── Video quality profile ─────────────────────────
   type VideoQualityProfile = "auto" | "data-saver" | "hd" | "fhd";
@@ -222,6 +226,7 @@
     document.removeEventListener("fullscreenchange", handleFullscreenChange);
     unsubscribeCallEvents();
     rejectionResetTimers.forEach((t) => clearTimeout(t));
+    inviteTimeouts.forEach((t) => clearTimeout(t));
   });
 
   // ── Recording ──────────────────────────────────────
@@ -602,6 +607,17 @@
     try {
       await addParticipant(session.callId, userId);
       inviteStatuses = new Map(inviteStatuses).set(userId, "invited");
+      // Cancel any previous expiry timer for this user (e.g. a re-invite).
+      const prev = inviteTimeouts.get(userId);
+      if (prev) clearTimeout(prev);
+      // Auto-expire "Invite Sent" after 45 s if the user never joins or
+      // explicitly rejects.  Join / rejection cancel this timer first.
+      const t = setTimeout(() => {
+        inviteStatuses.delete(userId);
+        inviteStatuses = new Map(inviteStatuses);
+        inviteTimeouts.delete(userId);
+      }, 45_000);
+      inviteTimeouts.set(userId, t);
     } catch (e) {
       inviteStatuses.delete(userId);
       inviteStatuses = new Map(inviteStatuses);
@@ -619,6 +635,9 @@
     if (!event || event.type !== "call:participant-rejected" || !event.userId)
       return;
     const uid = event.userId;
+    // Cancel the no-show expiry timer — an explicit rejection supersedes it.
+    const inviteTimeout = inviteTimeouts.get(uid);
+    if (inviteTimeout) { clearTimeout(inviteTimeout); inviteTimeouts.delete(uid); }
     // Clear any existing reset timer for this user.
     const existing = rejectionResetTimers.get(uid);
     if (existing) clearTimeout(existing);
@@ -631,6 +650,44 @@
     }, 4000);
     rejectionResetTimers.set(uid, timer);
   });
+
+  // ── Invite-state sync with LiveKit participant list ────────────────────
+  // Re-runs whenever the set of remote participants changes.  Handles three
+  // cases that the rejection-event path cannot cover:
+  //   • User joins  → clear "Invite Sent" badge (they're already in the call)
+  //   • User leaves → clear "Invite Sent" so they become re-invitable
+  //   • User drops  → same as leaves (LiveKit removes them from the list)
+  // Only plain `let` variables are read here (no store subscriptions other
+  // than $callStore), so there is no reactive cycle risk.
+  $: {
+    const nextIds = new Set(
+      $callStore.remoteParticipants.map((p) => p.identity),
+    );
+    let changed = false;
+
+    // Participants who just joined: drop their pending invite status.
+    for (const id of nextIds) {
+      if (inviteStatuses.delete(id)) changed = true;
+      const it = inviteTimeouts.get(id);
+      if (it) { clearTimeout(it); inviteTimeouts.delete(id); }
+      const rt = rejectionResetTimers.get(id);
+      if (rt) { clearTimeout(rt); rejectionResetTimers.delete(id); }
+    }
+
+    // Participants who just left or dropped: reset so they can be re-invited.
+    for (const id of prevRemoteIds) {
+      if (!nextIds.has(id)) {
+        if (inviteStatuses.delete(id)) changed = true;
+        const it = inviteTimeouts.get(id);
+        if (it) { clearTimeout(it); inviteTimeouts.delete(id); }
+        const rt = rejectionResetTimers.get(id);
+        if (rt) { clearTimeout(rt); rejectionResetTimers.delete(id); }
+      }
+    }
+
+    if (changed) inviteStatuses = new Map(inviteStatuses);
+    prevRemoteIds = nextIds;
+  }
 </script>
 
 <!-- Full-screen meeting room overlay -->
@@ -1650,10 +1707,12 @@
   .participants-grid {
     display: grid;
     grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
-    gap: 0.5rem;
+    /* No explicit rows — tiles with aspect-ratio:16/9 set their own height.
+       align-content:center vertically centres the grid when it is shorter
+       than the stage (Google Meet style dark space above/below). */
+    gap: 0.625rem;
     inline-size: 100%;
-    block-size: 100%;
+    align-content: center;
   }
 
   /* Single participant: cap width so the tile doesn't stretch too wide */
@@ -1662,15 +1721,16 @@
     margin-inline: auto;
   }
 
-  /* Tiles inside the grid fill their cell; aspect-ratio is enforced by the
-     cell dimensions, not by the tile itself, so nothing gets clipped. */
+  /* Tiles fill their grid-item (whose dimensions come from aspect-ratio:16/9). */
   .participants-grid :global(.tile) {
-    aspect-ratio: auto;
     inline-size: 100%;
     block-size: 100%;
   }
 
   .grid-item {
+    /* Each tile cell maintains 16:9 — mirrors the camera/content aspect ratio.
+       The tile fills this cell 100%x100%; object-fit:contain shows the full frame. */
+    aspect-ratio: 16 / 9;
     min-block-size: 0;
     min-inline-size: 0;
   }
@@ -2292,13 +2352,13 @@
       gap: 0.375rem;
     }
 
-    /* Mobile: single column, one tile per row stacked vertically */
-    .participants-grid {
+    /* 2-participant layout: keep in one column on mobile so each 16:9 tile is
+       tall enough to comfortably show the person. 3+ participants use the
+       JS-calculated column count (2 or 3 cols) for side-by-side tiles. */
+    .participants-grid[style*="--cols: 2"] {
       grid-template-columns: 1fr !important;
-      grid-template-rows: repeat(var(--count, auto), minmax(0, 1fr)) !important;
     }
 
-    /* On mobile every tile spans its own row, so centering is irrelevant */
     .grid-item--center-last {
       grid-column: auto;
       display: block;

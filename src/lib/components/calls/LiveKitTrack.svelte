@@ -78,7 +78,9 @@
     inline-size: 100%;
     block-size: 100%;
     min-block-size: inherit;
-    object-fit: cover;
+    /* contain shows the full camera/screen-share frame without cropping */
+    object-fit: contain;
+    background: transparent; /* letterbox colour comes from the parent tile */
   }
 
   .mirror {
