@@ -90,7 +90,7 @@
       <svg
         width="24"
         height="24"
-        viewBox="0 0 24 24"
+        viewBox="2.5 -1.5 24 24"
         fill="currentColor"
         aria-hidden="true"
       >
@@ -100,7 +100,7 @@
       <svg
         width="24"
         height="24"
-        viewBox="0 0 24 24"
+        viewBox="2.5 -1.5 24 24"
         fill="none"
         aria-hidden="true"
       >
@@ -308,9 +308,12 @@
   .tile-video :global(video) {
     inline-size: 100%;
     block-size: 100%;
-    object-fit: cover;
+    /* Show the full video frame — tile background acts as letterbox colour */
+    object-fit: contain;
+    background: #141e2e; /* matches .tile background; fills letterbox areas */
   }
 
+  /* Screen share: identical contain behaviour but with pure-black bars */
   .tile.screen-share .tile-video :global(video) {
     object-fit: contain;
     background: #000;
@@ -376,6 +379,8 @@
     width: 24px;
     height: 24px;
     display: block;
+    flex-shrink: 0;
+    margin: auto;
   }
 
   .tile:hover .pin-btn,
