@@ -39,6 +39,8 @@
   const dispatch = createEventDispatcher<{ endCall: void }>();
 
   let meetingRoomEl: HTMLDivElement;
+  let stageEl: HTMLElement;
+  let resizeObs: ResizeObserver | null = null;
 
   // ── Pin / layout state ─────────────────────────────
   let pinnedId: string | null = null;
@@ -218,12 +220,15 @@
       );
     }, 1000);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    resizeObs = new ResizeObserver(() => recomputeGridLayout());
+    if (stageEl) { resizeObs.observe(stageEl); recomputeGridLayout(); }
   });
 
   onDestroy(() => {
     if (isRecordingCall) stopRecordingMedia();
     if (elapsedTimer) clearInterval(elapsedTimer);
     document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    resizeObs?.disconnect();
     unsubscribeCallEvents();
     rejectionResetTimers.forEach((t) => clearTimeout(t));
     inviteTimeouts.forEach((t) => clearTimeout(t));
@@ -532,20 +537,66 @@
 
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
   $: totalParticipants = allTiles.length;
-  $: gridCols =
-    totalParticipants <= 1
-      ? 1
-      : totalParticipants <= 2
-        ? 2
-        : totalParticipants <= 4
-          ? 2
-          : totalParticipants <= 9
-            ? 3
-            : 4;
-  $: gridRows = Math.ceil(totalParticipants / gridCols);
-  // True when the last tile occupies a row by itself (e.g. 3 tiles in 2 cols)
-  $: lastTileAlone =
-    totalParticipants > 1 && totalParticipants % gridCols !== 0;
+  // ── Responsive grid: Google Meet-style layout algorithm ─────────────────────
+  // gridCols / lastTileAlone are set by recomputeGridLayout(), called by both
+  // a ResizeObserver (container / viewport resize) and a reactive $: block
+  // (participant-count change). No static column table — container height matters.
+  let gridCols = 1;
+  let lastTileAlone = false;
+
+  /** Gap between tiles in px — mirrors CSS `gap: 0.625rem` at 16 px root. */
+  const GRID_GAP = 10;
+  const TILE_ASPECT = 16 / 9;
+
+  /**
+   * For each candidate column count (1…N) check whether all rows fit within
+   * the available height at 16:9 and pick the layout that maximises tile area —
+   * identical to the algorithm Google Meet uses for its video grid.
+   */
+  function computeOptimalCols(n: number, w: number, h: number): number {
+    if (n <= 1) return 1;
+    let bestCols = 1;
+    let bestArea = -Infinity;
+    for (let c = 1; c <= n; c++) {
+      const r = Math.ceil(n / c);
+      const tileW = (w - (c - 1) * GRID_GAP) / c;
+      if (tileW <= 0) continue;
+      const tileH = tileW / TILE_ASPECT;
+      const gridH = r * tileH + (r - 1) * GRID_GAP;
+      if (gridH <= h + 0.5) {          // +0.5 for floating-point tolerance
+        const area = tileW * tileH;
+        if (area > bestArea) { bestArea = area; bestCols = c; }
+      }
+    }
+    // Edge case: every layout overflows the height — fall back to max-area row.
+    if (bestArea === -Infinity) {
+      for (let c = 1; c <= n; c++) {
+        const tileW = (w - (c - 1) * GRID_GAP) / c;
+        if (tileW <= 0) continue;
+        const area = (tileW / TILE_ASPECT) * tileW;
+        if (area > bestArea) { bestArea = area; bestCols = c; }
+      }
+    }
+    return bestCols;
+  }
+
+  /** Read stage padding + client dimensions, compute optimal cols, write vars. */
+  function recomputeGridLayout() {
+    if (!stageEl) return;
+    const cs = getComputedStyle(stageEl);
+    const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const w = stageEl.clientWidth - padH;
+    const h = stageEl.clientHeight - padV;
+    if (w <= 0 || h <= 0) return;
+    const cols = computeOptimalCols(totalParticipants, w, h);
+    gridCols = cols;
+    lastTileAlone = totalParticipants > 1 && totalParticipants % cols !== 0;
+  }
+
+  // Reactive: re-run when participant count changes.
+  // ResizeObserver (onMount) handles container/viewport resizes.
+  $: if (totalParticipants >= 0 && stageEl) recomputeGridLayout();
   $: roomDisplayId = session.roomName ?? session.callId ?? "N/A";
 
   // ── Add people ──────────────────────────────────────
@@ -827,6 +878,7 @@
     class="video-stage"
     aria-label="Participants"
     class:is-spotlight={isSpotlight}
+    bind:this={stageEl}
   >
     {#if isSpotlight && pinnedTile}
       <!-- ── Spotlight layout: main tile + thumbnail strip ── -->
@@ -918,7 +970,7 @@
       <!-- ── Grid layout: responsive grid of all participants ── -->
       <div
         class="participants-grid"
-        style="--cols: {gridCols}; --rows: {gridRows}"
+        style="--cols: {gridCols}"
         aria-label="{totalParticipants} participant{totalParticipants !== 1
           ? 's'
           : ''}"
@@ -2352,13 +2404,6 @@
       gap: 0.375rem;
     }
 
-    /* 2-participant layout: keep in one column on mobile so each 16:9 tile is
-       tall enough to comfortably show the person. 3+ participants use the
-       JS-calculated column count (2 or 3 cols) for side-by-side tiles. */
-    .participants-grid[style*="--cols: 2"] {
-      grid-template-columns: 1fr !important;
-    }
-
     .grid-item--center-last {
       grid-column: auto;
       display: block;
@@ -2402,12 +2447,7 @@
     }
   }
 
-  /* Tablet: reduce 3-col grid to 2 cols, and recompute rows on the spot */
-  @media (max-width: 900px) {
-    .participants-grid[style*="--cols: 3"] {
-      grid-template-columns: repeat(2, 1fr) !important;
-    }
-  }
+
   /* ── Presenter banner (shown above spotlight when screen sharing) ── */
   .presenter-banner {
     display: flex;
