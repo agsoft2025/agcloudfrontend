@@ -1,4 +1,4 @@
-import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { test, expect, type Page, type BrowserContext, type WebSocketRoute } from '@playwright/test';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -174,13 +174,10 @@ async function interceptLiveKitToken(page: Page, status = 200) {
   );
 }
 
-/** Silently swallow Socket.IO requests so the UI does not show connection errors. */
+/** Silently swallow Socket.IO HTTP-polling requests so the UI does not show connection errors. */
 async function silenceSocketIO(page: Page) {
-  // Socket.IO HTTP polling handshake — return a minimal open-packet response
   await page.route(`${API_BASE}/socket.io/**`, (route) => {
-    const url = route.request().url();
     if (route.request().method() === 'GET') {
-      // Engine.IO v4 open packet: "0{...}" tells the client the connection is open
       route.fulfill({
         status: 200,
         contentType: 'text/plain; charset=UTF-8',
@@ -189,6 +186,43 @@ async function silenceSocketIO(page: Page) {
     } else {
       route.fulfill({ status: 200, contentType: 'text/plain', body: 'ok' });
     }
+  });
+}
+
+/**
+ * Intercept the Socket.IO WebSocket and inject a `call:incoming` event.
+ *
+ * Socket.IO is configured with transports: ['websocket', 'polling'], so it
+ * connects via WebSocket first without an HTTP polling handshake.
+ * page.routeWebSocket() intercepts that connection and sends proper
+ * Engine.IO / Socket.IO framing, then emits the desired event after the
+ * app's event handlers are registered.
+ *
+ * Frame format (WebSocket transport — no length prefix):
+ *   "0{...}"  = Engine.IO open packet
+ *   "40"      = Socket.IO namespace connect
+ *   "42[...]" = Socket.IO emit
+ */
+async function routeSocketWithIncomingCall(
+  page: Page,
+  payload: object,
+  delayMs = 350,
+): Promise<void> {
+  await page.routeWebSocket(/socket\.io/, (ws: WebSocketRoute) => {
+    // Engine.IO open — no upgrades so the client stays on this WebSocket
+    ws.send(
+      '0{"sid":"test-ws-sid","upgrades":[],"pingInterval":25000,"pingTimeout":5000,"maxPayload":1000000}',
+    );
+    // Socket.IO namespace connect confirmation
+    ws.send('40');
+    // Inject event after a short delay so call-signaling.ts handlers are registered
+    setTimeout(() => {
+      ws.send(`42["call:incoming",${JSON.stringify(payload)}]`);
+    }, delayMs);
+    // Respond to Engine.IO heartbeat pings to keep the connection alive
+    ws.onMessage((msg: string | Buffer) => {
+      if (typeof msg === 'string' && msg === '2') ws.send('3');
+    });
   });
 }
 
@@ -365,100 +399,57 @@ test.describe('Call Flow', () => {
 
   test.describe('Join call — incoming call overlay', () => {
     /**
-     * The incoming call overlay is triggered by the `call:incoming` Socket.IO event,
-     * which drives the activeCallStore into `incoming-ringing` phase.
-     * Tests here cover the IncomingCallOverlay UI and the accept / reject actions.
+     * Incoming call tests use page.routeWebSocket() to intercept the Socket.IO
+     * WebSocket connection and inject Engine.IO / Socket.IO framing directly.
      *
-     * Full socket-event injection requires either a live Socket.IO server or a
-     * Socket.IO WebSocket mock. The tests below use page.evaluate() to directly
-     * set the activeCallStore state before the overlay renders.
+     * Flow:
+     *   page.routeWebSocket(/socket\.io/) fires when the app's Socket.IO client
+     *   opens a WebSocket.  We send the EIO open packet, the Socket.IO namespace
+     *   connect, and then after a short delay the `call:incoming` event.
+     *   call-signaling.ts receives it and drives activeCallStore → incoming-ringing,
+     *   which causes GlobalCallManager to mount IncomingCallOverlay.
      *
-     * The store is a Svelte module-level singleton; we trigger the state change by
-     * dispatching a custom window event that the test harness intercept script
-     * listens for.  No app-code changes are required because page.addInitScript()
-     * runs in the page context before any module code executes.
+     * Why WebSocket and not HTTP polling:
+     *   socket.ts uses transports: ['websocket', 'polling'] — WebSocket is attempted
+     *   first without a polling handshake, so routeWebSocket() intercepts directly.
      */
 
-    /**
-     * Helper: put the activeCallStore into the incoming-ringing state by simulating
-     * a `call:incoming` socket event payload directly via the store.
-     *
-     * Because module imports aren't accessible from page.evaluate(), we inject a
-     * script that monkey-patches the Socket.IO `on('call:incoming')` handler
-     * by firing the event through the Socket.IO EventEmitter.
-     * Requires silenceSocketIO() to have been set up so the socket connects.
-     */
-    async function simulateIncomingCall(page: Page, callId = MOCK_CALL_ID) {
-      // Wait for the page to boot and the socket module to initialise
-      await page.waitForTimeout(300);
+    /** Canonical caller payload for incoming-call tests. */
+    const CALLER = {
+      callId: MOCK_CALL_ID,
+      callerId: 'user-caller-remote',
+      callerName: 'Remote Caller',
+      callerAvatar: null,
+      callType: 'video',
+      callMode: 'one-to-one',
+      roomId: `room-${MOCK_CALL_ID}`,
+      reinvite: false,
+    } as const;
 
-      // Dispatch the call via the exposed test hook (added by addInitScript below)
-      await page.evaluate((cId) => {
-        window.dispatchEvent(new CustomEvent('__test:call:incoming', {
-          detail: {
-            callId: cId,
-            callerId: 'user-caller-remote',
-            callerName: 'Remote Caller',
-            callerAvatar: null,
-            callType: 'video',
-            callMode: 'one-to-one',
-            roomId: 'room-' + cId,
-            reinvite: false,
-          }
-        }));
-      }, callId);
-    }
-
-    /**
-     * This init script runs before any app code and wires up the test event so
-     * page.evaluate() can trigger store state changes without modifying source files.
-     */
-    async function injectCallSignalingBridge(context: BrowserContext) {
-      await context.addInitScript(() => {
-        // Once the app boots, the socket module sets up event listeners.
-        // We bridge our custom DOM event into the Socket.IO event bus by
-        // re-emitting on the same global socket instance after it is created.
-        // The bridge listens on window and forwards to the socket's EventEmitter.
-        window.addEventListener('__test:call:incoming', (e) => {
-          const detail = (e as CustomEvent).detail;
-          // Attempt to trigger via the global socket if accessible
-          // (works when socket.io is imported and the module is initialized)
-          try {
-            const io = (window as unknown as { __socket?: { emit: (ev: string, data: unknown) => void } }).__socket;
-            if (io?.emit) { io.emit('call:incoming', detail); return; }
-          } catch { /* ignore */ }
-
-          // Fallback: simulate the socket event by dispatching on document
-          document.dispatchEvent(new CustomEvent('socket:call:incoming', { detail }));
-        });
-      });
-    }
+    /** ariaLabel produced by IncomingCallOverlay: `Incoming ${callType} call from ${callerName}` */
+    const OVERLAY_LABEL = `Incoming ${CALLER.callType} call from ${CALLER.callerName}`;
 
     test('shows the incoming call overlay with caller details', async ({ page, context }) => {
       await injectAuthSession(context);
-      await injectCallSignalingBridge(context);
-      await silenceSocketIO(page);
       await interceptContacts(page);
       await interceptCallHistory(page);
-      await interceptAcceptCall(page);
-      await interceptRejectCall(page);
+      await routeSocketWithIncomingCall(page, CALLER);
 
       await goToHome(page);
-      await simulateIncomingCall(page);
 
-      // Verify at minimum that the inbound section of the home page is accessible
-      // Full overlay requires real socket event propagation through call-signaling.ts
-      // which is covered by unit tests in active-call.store.test.ts
-      await expect(page.getByRole('listbox', { name: 'Contact list' })).toBeVisible();
+      const overlay = page.getByRole('dialog', { name: OVERLAY_LABEL });
+      await expect(overlay).toBeVisible({ timeout: 5_000 });
+      // Caller name must appear inside the overlay
+      await expect(overlay.getByText(CALLER.callerName)).toBeVisible();
     });
 
     test('accept call button calls the acceptCall API', async ({ page, context }) => {
       let acceptCalled = false;
 
       await injectAuthSession(context);
-      await silenceSocketIO(page);
       await interceptContacts(page);
       await interceptCallHistory(page);
+      await routeSocketWithIncomingCall(page, CALLER);
 
       await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/accept`, (route) => {
         acceptCalled = true;
@@ -469,22 +460,30 @@ test.describe('Call Flow', () => {
         });
       });
 
-      // Navigate to a call detail page and trigger accept via URL-based accept
-      // The /call/[roomName] route accepts a call when the activeCallStore has incoming-ringing phase
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
+      await goToHome(page);
 
-      // Confirm the page loads without errors
-      await expect(page).toHaveURL(/\/home/);
+      const overlay = page.getByRole('dialog', { name: OVERLAY_LABEL });
+      await expect(overlay).toBeVisible({ timeout: 5_000 });
+
+      // Wait for the HTTP request to be made, then click
+      const acceptRequest = page.waitForRequest((r) =>
+        r.url().includes(`/calls/${MOCK_CALL_ID}/accept`)
+      );
+      await overlay
+        .getByRole('button', { name: `Accept call from ${CALLER.callerName}` })
+        .click();
+      await acceptRequest;
+
+      expect(acceptCalled).toBe(true);
     });
 
-    test('reject call button calls the rejectCall API', async ({ page, context }) => {
+    test('reject call button calls the rejectCall API and dismisses the overlay', async ({ page, context }) => {
       let rejectCalled = false;
 
       await injectAuthSession(context);
-      await silenceSocketIO(page);
       await interceptContacts(page);
       await interceptCallHistory(page);
+      await routeSocketWithIncomingCall(page, CALLER);
 
       await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/reject`, (route) => {
         rejectCalled = true;
@@ -495,9 +494,55 @@ test.describe('Call Flow', () => {
         });
       });
 
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/home/);
+      await goToHome(page);
+
+      const overlay = page.getByRole('dialog', { name: OVERLAY_LABEL });
+      await expect(overlay).toBeVisible({ timeout: 5_000 });
+
+      const rejectRequest = page.waitForRequest((r) =>
+        r.url().includes(`/calls/${MOCK_CALL_ID}/reject`)
+      );
+      await overlay
+        .getByRole('button', { name: `Reject call from ${CALLER.callerName}` })
+        .click();
+      await rejectRequest;
+
+      expect(rejectCalled).toBe(true);
+      // handleReject() → activeCallStore.reset() → overlay unmounts
+      await expect(overlay).not.toBeVisible({ timeout: 3_000 });
+    });
+
+    test('call:cancelled socket event dismisses the incoming call overlay', async ({ page, context }) => {
+      await injectAuthSession(context);
+      await interceptContacts(page);
+      await interceptCallHistory(page);
+
+      // Capture the WebSocketRoute so we can send a second event later
+      let callerWs!: WebSocketRoute;
+      await page.routeWebSocket(/socket\.io/, (ws: WebSocketRoute) => {
+        callerWs = ws;
+        ws.send(
+          '0{"sid":"test-ws-sid","upgrades":[],"pingInterval":25000,"pingTimeout":5000,"maxPayload":1000000}',
+        );
+        ws.send('40');
+        setTimeout(() => {
+          ws.send(`42["call:incoming",${JSON.stringify(CALLER)}]`);
+        }, 350);
+        ws.onMessage((msg: string | Buffer) => {
+          if (typeof msg === 'string' && msg === '2') ws.send('3');
+        });
+      });
+
+      await goToHome(page);
+
+      const overlay = page.getByRole('dialog', { name: OVERLAY_LABEL });
+      await expect(overlay).toBeVisible({ timeout: 5_000 });
+
+      // Simulate caller hanging up before the callee answers
+      callerWs.send(`42["call:cancelled",{"callId":"${MOCK_CALL_ID}"}]`);
+
+      // call-signaling.ts → activeCallStore.reset() → overlay unmounts
+      await expect(overlay).not.toBeVisible({ timeout: 3_000 });
     });
   });
 
@@ -603,36 +648,23 @@ test.describe('Call Flow', () => {
   test.describe('Add-participant modal', () => {
     /**
      * The "Add people" button and modal live inside CallSession, which only
-     * renders once the LiveKit room is fully connected (session !== null in
-     * the call page, or phase === 'in-call' in GlobalCallManager).
+     * renders once the LiveKit room is fully connected.  Full UI tests require
+     * a reachable LiveKit server (Docker-compose integration test setup).
      *
-     * Without a reachable LiveKit server these tests verify the API contract
-     * and the modal's behaviour in isolation via the contacts home flow that
-     * does reach the CallSession component through GlobalCallManager once the
-     * phase is 'in-call'.
-     *
-     * For a complete integration test a real (or Docker-compose-based)
-     * LiveKit server is required.
+     * The first test below is skipped for that reason.  The second verifies
+     * the /users API contract used by the add-participant contact search.
      */
 
     test('add-participant API is called with the correct call ID and user ID', async ({ page, context }) => {
-      let addParticipantPayload: { userId?: string } | null = null;
+      // Skipped: CallSession only renders when LiveKit is connected.
+      // To test: spin up a LiveKit dev server, have two users join, then
+      // open the "Add people" modal and verify POST /calls/:id/add-participant
+      // is called with { userId } in the body.
+      test.skip(true, 'Requires an active LiveKit session — pending integration test setup');
 
       await injectAuthSession(context);
       await silenceSocketIO(page);
-
-      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/add-participant`, async (route) => {
-        addParticipantPayload = await route.request().postDataJSON() as { userId?: string };
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(mockAddParticipantResponse()),
-        });
-      });
-
-      // Verify the route is registered and would be called with the right shape
-      // (Full UI test requires an active call session — see note above)
-      expect(addParticipantPayload).toBeNull(); // no call made yet — correct pre-condition
+      await interceptAddParticipant(page);
     });
 
     test('contact search filters the add-participant list', async ({ page, context }) => {
@@ -664,14 +696,9 @@ test.describe('Call Flow', () => {
 
   test.describe('Screen sharing', () => {
     /**
-     * Screen sharing uses navigator.mediaDevices.getDisplayMedia, which
-     * requires an active LiveKit room.  Tests here verify the mock-able
-     * parts of the flow.
-     *
-     * Full UI tests (clicking the "Share screen" button in CallSession's
-     * controls bar and seeing the presenter banner) require a connected
-     * LiveKit room.  Those are exercised by integration tests against a
-     * LiveKit dev server.
+     * Screen sharing uses navigator.mediaDevices.getDisplayMedia inside an active
+     * LiveKit room.  Full UI tests (clicking "Share screen", seeing the presenter
+     * banner) require a connected LiveKit room and are covered by integration tests.
      */
 
     test('the getDisplayMedia API is available in the browser context', async ({ page, context }) => {
@@ -691,26 +718,18 @@ test.describe('Call Flow', () => {
     });
 
     test('screen share start/stop record API endpoints have correct routes', async ({ page, context }) => {
+      // Skipped: the record/start and record/stop buttons are inside CallSession,
+      // which only renders when LiveKit is connected.
+      // To test: join a real call, click "Share screen", verify the route is hit.
+      test.skip(true, 'Requires an active LiveKit session — pending integration test setup');
+
       await injectAuthSession(context);
-
-      let startRecordCalled = false;
-      let stopRecordCalled = false;
-
-      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/start`, (route) => {
-        startRecordCalled = true;
-        route.fulfill({ status: 200, contentType: 'application/json', body: '{"message":"Recording started"}' });
-      });
-      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/stop`, (route) => {
-        stopRecordCalled = true;
-        route.fulfill({ status: 200, contentType: 'application/json', body: '{"message":"Recording stopped"}' });
-      });
-
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
-
-      // No recording started yet — APIs are ready to intercept when called from the session
-      expect(startRecordCalled).toBe(false);
-      expect(stopRecordCalled).toBe(false);
+      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/start`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{"message":"Recording started"}' })
+      );
+      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/stop`, (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{"message":"Recording stopped"}' })
+      );
     });
 
     test('call page shows share-screen error state when LiveKit is unavailable', async ({ page, context }) => {
@@ -730,13 +749,13 @@ test.describe('Call Flow', () => {
 
   test.describe('Recording', () => {
     /**
-     * Recording uses the browser MediaRecorder API and calls POST /calls/:id/record/start.
-     * The "Start recording" / "Stop recording" toggle button lives inside CallSession's
-     * controls bar (aria-label="Start recording" / "Stop recording").
+     * Recording uses the browser MediaRecorder API and calls
+     * POST /calls/:id/record/start.  The toggle button lives inside
+     * CallSession's controls bar (aria-label="Start recording").
      *
      * Full UI testing requires an active LiveKit session.  The tests below verify:
-     *   - The recording API endpoints are wired correctly
      *   - MediaRecorder is available in the test browser context
+     *   - The error state renders correctly when LiveKit is unavailable
      */
 
     test('MediaRecorder is available in the browser context', async ({ page, context }) => {
@@ -749,46 +768,34 @@ test.describe('Call Flow', () => {
     });
 
     test('record/start API is set up with the correct endpoint shape', async ({ page, context }) => {
+      // Skipped: the "Start recording" button is inside CallSession, which only
+      // renders when LiveKit is connected.
+      // To test: join a real call, click "Start recording", verify
+      // POST /calls/:id/record/start is called with the correct body.
+      test.skip(true, 'Requires an active LiveKit session — pending integration test setup');
+
       await injectAuthSession(context);
-
-      const recordStartUrl = `${API_BASE}/calls/${MOCK_CALL_ID}/record/start`;
-      let requestReceived = false;
-
-      await page.route(recordStartUrl, (route) => {
-        requestReceived = true;
+      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/start`, (route) =>
         route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ message: 'Call recording started successfully.', egressId: 'egress-001' }),
-        });
-      });
-
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
-
-      // Pre-condition: no recording request before user enters the call
-      expect(requestReceived).toBe(false);
+        })
+      );
     });
 
     test('record/stop API is set up with the correct endpoint shape', async ({ page, context }) => {
+      // Skipped: same as record/start — requires an active LiveKit session.
+      test.skip(true, 'Requires an active LiveKit session — pending integration test setup');
+
       await injectAuthSession(context);
-
-      const recordStopUrl = `${API_BASE}/calls/${MOCK_CALL_ID}/record/stop`;
-      let requestReceived = false;
-
-      await page.route(recordStopUrl, (route) => {
-        requestReceived = true;
+      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/record/stop`, (route) =>
         route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ message: 'Call recording stopped successfully.' }),
-        });
-      });
-
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
-
-      expect(requestReceived).toBe(false);
+        })
+      );
     });
 
     test('call page shows error (not REC badge) when LiveKit is unavailable', async ({ page, context }) => {
@@ -808,25 +815,17 @@ test.describe('Call Flow', () => {
 
   test.describe('Leave call', () => {
     test('leaveCall API endpoint exists and returns the expected shape', async ({ page, context }) => {
+      // Skipped: the "Leave" button that triggers leaveCall() is inside CallSession
+      // in the connected in-call state, not on the error page.
+      // To test: join a real call, click "Leave", verify POST /calls/:id/leave is
+      // called and the user is navigated back to /home.
+      // Note: the error-page "Leave" button calls navigate('/home') directly and
+      // does NOT hit the leave API — that is tested separately above
+      // ('leave button navigates back to /home').
+      test.skip(true, 'Requires an active LiveKit session — pending integration test setup');
+
       await injectAuthSession(context);
-
-      let leavePayload: unknown = null;
-
-      await page.route(`${API_BASE}/calls/${MOCK_CALL_ID}/leave`, (route) => {
-        leavePayload = route.request().method();
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(mockLeaveCallResponse()),
-        });
-      });
-
-      await page.goto('/home');
-      await page.waitForLoadState('networkidle');
-
-      // Leave endpoint is POST — verify the route is registered correctly
-      // Full test requires an active call session
-      expect(leavePayload).toBeNull();
+      await interceptLeaveCall(page);
     });
   });
 });
