@@ -1,0 +1,399 @@
+/* ═══════════════════════════════════════════════════════════════
+   AG Cloud — Centralized Theme Tokens
+   ───────────────────────────────────────────────────────────────
+   All colour decisions live here. Every other file references
+   custom properties only — no hardcoded colour values.
+
+   VARIABLE NAMING CONVENTION
+   ──────────────────────────
+   --color-<role>[-modifier]
+     role      : background | surface | text | border | error | etc.
+     modifier  : secondary | muted | subtle | raised | strong | etc.
+
+   HOW TO ADD A NEW THEME
+   ──────────────────────
+   1. Add a [data-theme="your-theme"] selector block below.
+   2. Override only the tokens that differ from the light theme.
+   3. No JS changes needed — CSS handles everything automatically.
+
+   HOW TO ADD A NEW TOKEN
+   ──────────────────────
+   1. Define it in both :root / [data-theme="light"] and
+      [data-theme="dark"] (and the @media fallback block).
+   2. Use it in components via var(--your-new-token).
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── LIGHT (default) ──────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* ── Brand (fixed across themes) */
+  --color-primary:          #1e2d4a;
+  --color-primary-hover:    #162238;
+  --color-secondary:        #4e87ff;
+  --color-secondary-hover:  #2f6fe8;
+  --color-tertiary:         #2c6e63;
+  --color-accent:           #7c3aed;
+
+  /* ── Page backgrounds */
+  --color-background:       #f0f4f8;
+  --color-surface:          #ffffff;
+  --color-surface-raised:   #f8fafc;
+  --color-surface-overlay:  rgba(255, 255, 255, 0.80);
+
+  /* ── Text */
+  --color-text:             #0f1923;
+  --color-text-secondary:   #374151;
+  --color-muted:            #6b7280;
+  --color-subtle:           #9ca3af;
+
+  /* ── Borders */
+  --color-border:           #e2e8f0;
+  --color-border-strong:    #cbd5e1;
+
+  /* ── Status — Error */
+  --color-error:            #dc2626;
+  --color-error-bg:         #fef2f2;
+  --color-error-border:     #fecaca;
+
+  /* ── Status — Success */
+  --color-success:          #16a34a;
+  --color-success-bg:       #f0fdf4;
+  --color-success-border:   #bbf7d0;
+
+  /* ── Auth surfaces */
+  --auth-card-bg:           #ffffff;
+  --auth-page-bg:           #0d1117;
+  --auth-input-bg:          #eef3f9;
+  --auth-input-bg-hover:    #e8eef6;
+  --auth-panel-gradient:    linear-gradient(165deg, #eef4ff 0%, #f5f9ff 42%, #fafcff 72%, #ffffff 100%);
+
+  /* ── Sidebar */
+  --sidebar-bg:             var(--auth-brand-bg);
+  --sidebar-border:         var(--auth-shell-border);
+  --sidebar-header-bg:      transparent;
+  --sidebar-text:           var(--color-text-secondary);
+  --sidebar-text-active:    var(--color-text);
+  --sidebar-hover-bg:       color-mix(in srgb, var(--color-secondary) 8%, transparent);
+  --sidebar-active-bg:      rgba(255, 255, 255, 0.76);
+  --sidebar-active-border:  rgba(203, 213, 225, 0.78);
+  --sidebar-active-sheen:   rgba(255, 255, 255, 0.08);
+  --sidebar-icon-color:     #64748b;
+  --sidebar-icon-active:    var(--color-secondary);
+  --sidebar-muted:          var(--color-muted);
+  --sidebar-user-name:      var(--color-text);
+  --sidebar-control-color:  var(--color-muted);
+  --sidebar-control-hover-bg: color-mix(in srgb, var(--color-secondary) 8%, transparent);
+  --sidebar-control-hover-color: var(--color-text);
+  --sidebar-user-avatar-bg: var(--color-primary);
+  --sidebar-user-avatar-color: #ffffff;
+  --sidebar-accent:         var(--color-secondary);
+  --sidebar-accent-glow:    rgba(78, 135, 255, 0.22);
+
+  /* ── Shadows */
+  --shadow-xs:              0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm:              0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md:              0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg:              0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl:              0 20px 25px -5px rgba(0, 0, 0, 0.10), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+  --shadow-2xl:             0 25px 50px -12px rgba(0, 0, 0, 0.18);
+  --shadow-auth-card:       0 32px 64px -12px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
+
+  /* ── Badge semantic colours */
+  --badge-success-bg:       #dcfae6;
+  --badge-success-color:    #067647;
+  --badge-success-border:   #abefc6;
+  --badge-warning-bg:       #fef0c7;
+  --badge-warning-color:    #b54708;
+  --badge-warning-border:   #fedf89;
+  --badge-danger-bg:        #fee4e2;
+  --badge-danger-color:     #b42318;
+  --badge-danger-border:    #fecdca;
+  --badge-info-color:       #175cd3;
+
+  /* ── Toast semantic colours */
+  --toast-success-accent:   #12b76a;
+  --toast-success-border:   #abefc6;
+  --toast-success-bg:       #f6fef9;
+  --toast-error-accent:     #f04438;
+  --toast-error-border:     #fecaca;
+  --toast-error-bg:         #fffbfa;
+  --toast-warning-accent:   #f79009;
+  --toast-warning-border:   #fedf89;
+  --toast-warning-bg:       #fffcf0;
+
+
+  /* ── Auth page structural surfaces */
+  --auth-page-gradient:
+    radial-gradient(circle at 12% 14%, rgba(78, 135, 255, 0.12) 0, transparent 24rem),
+    radial-gradient(circle at 88% 86%, rgba(44, 110, 99, 0.10) 0, transparent 24rem),
+    linear-gradient(135deg, #f8fafc 0%, #eef5f4 100%);
+  --auth-shell-border:     rgba(218, 226, 238, 0.92);
+  --auth-shell-bg:         rgba(255, 255, 255, 0.92);
+  --auth-brand-bg:
+    linear-gradient(155deg, rgba(239, 246, 255, 0.98) 0%,
+    rgba(248, 252, 255, 0.96) 48%, rgba(255, 255, 255, 0.94) 100%);
+  --auth-brand-kicker:     #5b8fd4;
+  --auth-brand-text:       #0f1923;
+  --auth-brand-desc:       #526173;
+  --auth-feature-text:     #374151;
+  --auth-illustration-border: rgba(226, 232, 240, 0.9);
+  --auth-illustration-bg:  rgba(255, 255, 255, 0.86);
+  --auth-card-gradient:
+    linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 0.84) 100%);
+
+  /* ── Home page layout */
+  --home-layout-bg:
+    radial-gradient(circle at 85% 8%, rgba(78, 135, 255, 0.07) 0%, transparent 28rem),
+    linear-gradient(135deg, #f8fafc 0%, #f0f7f5 100%);
+
+  /* ── Call workspace — light panel colours */
+  --call-card-bg:           rgba(255, 255, 255, 0.82);
+  --call-card-border:       rgba(203, 213, 225, 0.78);
+  --call-card-shadow:       0 24px 70px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --call-info-badge-bg:     #e9efff;
+  --call-info-badge-border: #dce6ff;
+  --call-info-badge-color:  #1d5bd8;
+  --call-ok-badge-bg:       #dcfce7;
+  --call-ok-badge-border:   #bbf7d0;
+  --call-ok-badge-color:    #16a34a;
+  --call-room-input-bg:     #ffffff;
+  --call-room-input-border: #cfd8e6;
+  --call-room-input-border-strong: #9aa9bc;
+  --call-room-input-color:  #0f172a;
+  --call-room-disabled-bg:  #f8fafc;
+  --call-room-label-color:  #334155;
+  --call-room-hint-color:   #64748b;
+  --call-info-header-color: #070b18;
+  --call-info-desc-color:   #64748b;
+  --call-panel-bg:          linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 255, 255, 0.92));
+  --call-status-info-bg:    rgba(78, 135, 255, 0.06);
+  --call-status-info-border:rgba(78, 135, 255, 0.22);
+
+  /* ── Avatar — online indicator */
+  --color-online: #12b76a;
+  /* ── Focus ring */
+  --focus-ring-color:       rgba(78, 135, 255, 0.25);
+  --focus-ring:             0 0 0 3px var(--focus-ring-color);
+}
+
+/* ── DARK ─────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ── Page backgrounds */
+  --color-background:       #0d1117;
+  --color-surface:          #161b22;
+  --color-surface-raised:   #1c2128;
+  --color-surface-overlay:  rgba(22, 27, 34, 0.88);
+
+  /* ── Text */
+  --color-text:             #e6edf3;
+  --color-text-secondary:   #b3c0ce;
+  --color-muted:            #7d8590;
+  --color-subtle:           #656d76;
+
+  /* ── Borders */
+  --color-border:           #30363d;
+  --color-border-strong:    #484f58;
+
+  /* ── Status — Error */
+  --color-error:            #f85149;
+  --color-error-bg:         #1a0d0d;
+  --color-error-border:     #6e1a1a;
+
+  /* ── Status — Success */
+  --color-success:          #3fb950;
+  --color-success-bg:       #0a1a0f;
+  --color-success-border:   #1a4426;
+
+  /* ── Auth surfaces */
+  --auth-card-bg:           #161b22;
+  --auth-input-bg:          #21262d;
+  --auth-input-bg-hover:    #282e35;
+
+  /* ── Sidebar (stays intentionally dark, subtle depth shift) */
+  --sidebar-bg:             #0d1117;
+  --sidebar-border:         rgba(255, 255, 255, 0.06);
+  --sidebar-header-bg:      #1c2128;
+  --sidebar-text:           rgba(255, 255, 255, 0.72);
+  --sidebar-text-active:    #ffffff;
+  --sidebar-hover-bg:       rgba(255, 255, 255, 0.05);
+  --sidebar-active-bg:      rgba(255, 255, 255, 0.12);
+  --sidebar-active-border:  rgba(255, 255, 255, 0.12);
+  --sidebar-active-sheen:   rgba(255, 255, 255, 0.08);
+  --sidebar-icon-color:     rgba(255, 255, 255, 0.55);
+  --sidebar-icon-active:    #7ecfff;
+  --sidebar-muted:          #9ca3af;
+  --sidebar-user-name:      #ffffff;
+  --sidebar-control-color:  #9ca3af;
+  --sidebar-control-hover-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-control-hover-color: #e5e7eb;
+  --sidebar-user-avatar-bg: #374151;
+  --sidebar-user-avatar-color: #ffffff;
+  --sidebar-accent:         #7ecfff;
+  --sidebar-accent-glow:    rgba(126, 207, 255, 0.72);
+
+  /* ── Shadows (stronger in dark mode for depth perception) */
+  --shadow-xs:              0 1px 2px 0 rgba(0, 0, 0, 0.20);
+  --shadow-sm:              0 1px 3px 0 rgba(0, 0, 0, 0.30), 0 1px 2px -1px rgba(0, 0, 0, 0.20);
+  --shadow-md:              0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+  --shadow-lg:              0 10px 15px -3px rgba(0, 0, 0, 0.40), 0 4px 6px -4px rgba(0, 0, 0, 0.25);
+  --shadow-xl:              0 20px 25px -5px rgba(0, 0, 0, 0.50), 0 8px 10px -6px rgba(0, 0, 0, 0.30);
+  --shadow-2xl:             0 25px 50px -12px rgba(0, 0, 0, 0.60);
+  --shadow-auth-card:       0 32px 64px -12px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  /* ── Badge semantic colours — dark */
+  --badge-success-bg:       rgba(63, 185, 80, 0.15);
+  --badge-success-color:    #3fb950;
+  --badge-success-border:   rgba(63, 185, 80, 0.30);
+  --badge-warning-bg:       rgba(210, 153, 34, 0.15);
+  --badge-warning-color:    #d29922;
+  --badge-warning-border:   rgba(210, 153, 34, 0.30);
+  --badge-danger-bg:        rgba(248, 81, 73, 0.15);
+  --badge-danger-color:     #f85149;
+  --badge-danger-border:    rgba(248, 81, 73, 0.30);
+  --badge-info-color:       #79c0ff;
+
+  /* ── Toast semantic colours — dark */
+  --toast-success-accent:   #3fb950;
+  --toast-success-border:   rgba(63, 185, 80, 0.25);
+  --toast-success-bg:       #0d1b12;
+  --toast-error-accent:     #f85149;
+  --toast-error-border:     rgba(248, 81, 73, 0.25);
+  --toast-error-bg:         #1a0d0d;
+  --toast-warning-accent:   #d29922;
+  --toast-warning-border:   rgba(210, 153, 34, 0.25);
+  --toast-warning-bg:       #1a1508;
+
+
+  /* ── Auth page structural surfaces */
+  --auth-page-gradient:
+    radial-gradient(circle at 12% 14%, rgba(78, 135, 255, 0.08) 0, transparent 24rem),
+    radial-gradient(circle at 88% 86%, rgba(44, 110, 99, 0.06) 0, transparent 24rem),
+    #0d1117;
+  --auth-shell-border:     rgba(48, 54, 61, 0.90);
+  --auth-shell-bg:         rgba(22, 27, 34, 0.95);
+  --auth-brand-bg:
+    linear-gradient(155deg, rgba(13, 17, 23, 0.98) 0%,
+    rgba(22, 27, 34, 0.96) 48%, rgba(28, 33, 40, 0.94) 100%);
+  --auth-brand-kicker:     #79c0ff;
+  --auth-brand-text:       #e6edf3;
+  --auth-brand-desc:       #7d8590;
+  --auth-feature-text:     #b3c0ce;
+  --auth-illustration-border: rgba(48, 54, 61, 0.90);
+  --auth-illustration-bg:  rgba(22, 27, 34, 0.86);
+  --auth-card-gradient:
+    linear-gradient(180deg, #161b22 0%, rgba(22, 27, 34, 0.84) 100%);
+
+  /* ── Home page layout */
+  --home-layout-bg:
+    radial-gradient(circle at 85% 8%, rgba(78, 135, 255, 0.05) 0%, transparent 28rem),
+    linear-gradient(135deg, #0d1117 0%, #0f1318 100%);
+
+  /* ── Call workspace — dark panel colours */
+  --call-card-bg:           rgba(22, 27, 34, 0.88);
+  --call-card-border:       rgba(48, 54, 61, 0.78);
+  --call-card-shadow:       0 24px 70px rgba(0, 0, 0, 0.30), 0 2px 4px rgba(0, 0, 0, 0.15);
+  --call-info-badge-bg:     rgba(78, 135, 255, 0.12);
+  --call-info-badge-border: rgba(78, 135, 255, 0.25);
+  --call-info-badge-color:  #79c0ff;
+  --call-ok-badge-bg:       rgba(63, 185, 80, 0.12);
+  --call-ok-badge-border:   rgba(63, 185, 80, 0.25);
+  --call-ok-badge-color:    #3fb950;
+  --call-room-input-bg:     #21262d;
+  --call-room-input-border: #30363d;
+  --call-room-input-border-strong: #484f58;
+  --call-room-input-color:  #e6edf3;
+  --call-room-disabled-bg:  #1c2128;
+  --call-room-label-color:  #b3c0ce;
+  --call-room-hint-color:   #7d8590;
+  --call-info-header-color: #e6edf3;
+  --call-info-desc-color:   #7d8590;
+  --call-panel-bg:          linear-gradient(180deg, rgba(22, 27, 34, 0.97), rgba(22, 27, 34, 0.92));
+  --call-status-info-bg:    rgba(78, 135, 255, 0.10);
+  --call-status-info-border:rgba(78, 135, 255, 0.25);
+
+  /* ── Avatar — online indicator */
+  --color-online: #3fb950;
+  /* ── Focus ring */
+  --focus-ring-color:       rgba(78, 135, 255, 0.40);
+}
+
+/* ── SYSTEM PREFERENCE FALLBACK ───────────────────────────────── */
+/* Safety net for when JS hasn't run yet or is disabled.          */
+/* The JS theme manager sets data-theme immediately on load,      */
+/* so this block is normally not used in practice.                */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]),
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --color-background:       #0d1117;
+    --color-surface:          #161b22;
+    --color-surface-raised:   #1c2128;
+    --color-surface-overlay:  rgba(22, 27, 34, 0.88);
+    --color-text:             #e6edf3;
+    --color-text-secondary:   #b3c0ce;
+    --color-muted:            #7d8590;
+    --color-subtle:           #656d76;
+    --color-border:           #30363d;
+    --color-border-strong:    #484f58;
+    --color-error:            #f85149;
+    --color-error-bg:         #1a0d0d;
+    --color-error-border:     #6e1a1a;
+    --color-success:          #3fb950;
+    --color-success-bg:       #0a1a0f;
+    --color-success-border:   #1a4426;
+    --auth-card-bg:           #161b22;
+    --auth-input-bg:          #21262d;
+    --auth-input-bg-hover:    #282e35;
+    --sidebar-bg:             #0d1117;
+    --sidebar-border:         rgba(255, 255, 255, 0.06);
+    --sidebar-header-bg:      #1c2128;
+    --sidebar-text:           rgba(255, 255, 255, 0.72);
+    --sidebar-text-active:    #ffffff;
+    --sidebar-hover-bg:       rgba(255, 255, 255, 0.05);
+    --sidebar-active-bg:      rgba(255, 255, 255, 0.12);
+    --sidebar-active-border:  rgba(255, 255, 255, 0.12);
+    --sidebar-active-sheen:   rgba(255, 255, 255, 0.08);
+    --sidebar-icon-color:     rgba(255, 255, 255, 0.55);
+    --sidebar-icon-active:    #7ecfff;
+    --sidebar-muted:          #9ca3af;
+    --sidebar-user-name:      #ffffff;
+    --sidebar-control-color:  #9ca3af;
+    --sidebar-control-hover-bg: rgba(255, 255, 255, 0.06);
+    --sidebar-control-hover-color: #e5e7eb;
+    --sidebar-user-avatar-bg: #374151;
+    --sidebar-user-avatar-color: #ffffff;
+    --sidebar-accent:         #7ecfff;
+    --sidebar-accent-glow:    rgba(126, 207, 255, 0.72);
+    --shadow-xs:              0 1px 2px 0 rgba(0, 0, 0, 0.20);
+    --shadow-sm:              0 1px 3px 0 rgba(0, 0, 0, 0.30), 0 1px 2px -1px rgba(0, 0, 0, 0.20);
+    --shadow-md:              0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
+    --shadow-lg:              0 10px 15px -3px rgba(0, 0, 0, 0.40), 0 4px 6px -4px rgba(0, 0, 0, 0.25);
+    --shadow-xl:              0 20px 25px -5px rgba(0, 0, 0, 0.50), 0 8px 10px -6px rgba(0, 0, 0, 0.30);
+    --shadow-2xl:             0 25px 50px -12px rgba(0, 0, 0, 0.60);
+    --shadow-auth-card:       0 32px 64px -12px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --badge-success-bg:       rgba(63, 185, 80, 0.15);
+    --badge-success-color:    #3fb950;
+    --badge-success-border:   rgba(63, 185, 80, 0.30);
+    --badge-warning-bg:       rgba(210, 153, 34, 0.15);
+    --badge-warning-color:    #d29922;
+    --badge-warning-border:   rgba(210, 153, 34, 0.30);
+    --badge-danger-bg:        rgba(248, 81, 73, 0.15);
+    --badge-danger-color:     #f85149;
+    --badge-danger-border:    rgba(248, 81, 73, 0.30);
+    --badge-info-color:       #79c0ff;
+    --toast-success-accent:   #3fb950;
+    --toast-success-border:   rgba(63, 185, 80, 0.25);
+    --toast-success-bg:       #0d1b12;
+    --toast-error-accent:     #f85149;
+    --toast-error-border:     rgba(248, 81, 73, 0.25);
+    --toast-error-bg:         #1a0d0d;
+    --toast-warning-accent:   #d29922;
+    --toast-warning-border:   rgba(210, 153, 34, 0.25);
+    --toast-warning-bg:       #1a1508;
+    --focus-ring-color:       rgba(78, 135, 255, 0.40);
+  }
+}

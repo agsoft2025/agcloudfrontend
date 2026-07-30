@@ -2,8 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" href="/favicon.png" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2e3a59" />
+    <!--
+      THEME INITIALISATION — runs synchronously before any CSS or JS loads.
+      Prevents flash of wrong theme (FOWT) on page load/refresh.
+      Priority: 1. localStorage  2. OS preference  3. light fallback
+    -->
+    <script>
+      (function () {
+        try {
+          var key = 'ag-cloud-theme';
+          var saved = localStorage.getItem(key);
+          var resolved =
+            saved === 'dark' || saved === 'light'
+              ? saved
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (_) {
+          /* localStorage blocked — fall back to CSS media-query */
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
