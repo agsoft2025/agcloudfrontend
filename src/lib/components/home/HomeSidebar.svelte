@@ -94,7 +94,7 @@
 >
   <header class="sidebar-header">
     <div class="brand">
-      <img class="brand-logo" src="/logo.png" alt="AG Cloud" />
+      <img class="brand-logo" src="/logo.png" alt="AG Cloud" width="477" height="312" />
     </div>
     <button class="icon-btn close-btn" type="button" aria-label="Close navigation" on:click={closeMobile}>
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">

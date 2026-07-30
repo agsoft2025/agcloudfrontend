@@ -14,13 +14,26 @@
     /settings/*        → future settings pages
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { authStore } from '$lib/stores/auth.store';
   import HomeSidebar from '$lib/components/home/HomeSidebar.svelte';
-  import GlobalCallManager from '$lib/components/calls/GlobalCallManager.svelte';
+  import type { default as GlobalCallManagerType } from '$lib/components/calls/GlobalCallManager.svelte';
 
   let mobileNavOpen = false;
+
+  // See home/+layout.svelte for why this is lazy-loaded rather than a static
+  // import: it drags in livekit-client (~120 KB gzipped) transitively via
+  // CallSession, and this layout is otherwise unused (no pages currently sit
+  // under the (app) route group — see routes/(app)/+layout.svelte's header
+  // comment), but keeping it consistent with home/+layout.svelte avoids
+  // reintroducing the same bundle regression if/when this group is adopted.
+  let GlobalCallManager: typeof GlobalCallManagerType | null = null;
+
+  onMount(async () => {
+    ({ default: GlobalCallManager } = await import('$lib/components/calls/GlobalCallManager.svelte'));
+  });
 </script>
 
 <svelte:head>
@@ -73,7 +86,9 @@
   </div>
 
   <!-- Incoming / active call overlay — global, not tied to any route -->
-  <GlobalCallManager />
+  {#if GlobalCallManager}
+    <svelte:component this={GlobalCallManager} />
+  {/if}
 {/if}
 
 <style lang="postcss">
