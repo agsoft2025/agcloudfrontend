@@ -1,28 +1,17 @@
-import { test, expect, type Page, type BrowserContext, type WebSocketRoute } from '@playwright/test';
+import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
+import { injectAuthSession } from './helpers/auth';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 const API_BASE = process.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
-const MOCK_TOKEN = 'mock.jwt.token';
 const MOCK_CALL_ID = 'call-e2e-test-001';
 const MOCK_ROOM_NAME = 'room-e2e-test-001';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data factories
 // ─────────────────────────────────────────────────────────────────────────────
-
-function mockUser() {
-  return {
-    id: 'user-local-001',
-    email: 'caller@example.com',
-    displayName: 'Test Caller',
-    role: 'user',
-    status: 'active',
-    avatarUrl: null,
-  };
-}
 
 function mockContact(overrides: Partial<{
   id: string; email: string; displayName: string; avatarUrl: string | null;
@@ -224,20 +213,6 @@ async function routeSocketWithIncomingCall(
       if (typeof msg === 'string' && msg === '2') ws.send('3');
     });
   });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth injection helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function injectAuthSession(context: BrowserContext) {
-  await context.addInitScript(
-    (args: { token: string; user: string }) => {
-      localStorage.setItem('accessToken', args.token);
-      localStorage.setItem('authUser', args.user);
-    },
-    { token: MOCK_TOKEN, user: JSON.stringify(mockUser()) }
-  );
 }
 
 /** Navigate to /home, wait for the contacts panel to appear, then return. */

@@ -7,7 +7,9 @@
   import Toast from '$lib/components/molecules/Toast.svelte';
 
   onMount(() => {
-    // Re-read auth session from localStorage (handles hard refresh)
+    // Verify the session with the server via GET /auth/me (the HttpOnly
+    // auth cookie is sent automatically); this also re-establishes auth
+    // state after a hard refresh, since nothing is read from localStorage.
     authStore.initialize();
     // Start theme manager: reads localStorage, subscribes to OS changes
     themeStore.initialize();

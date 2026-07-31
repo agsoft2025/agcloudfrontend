@@ -758,7 +758,7 @@
   <!-- ── Top header bar ──────────────────────────── -->
   <header class="meeting-header">
     <div class="header-left">
-      <img class="meeting-logo" src="/logo.png" alt="AG Cloud" />
+      <img class="meeting-logo" src="/logo.png" alt="AG Cloud" width="477" height="312" />
       <div class="header-title">
         <span class="call-type-icon" aria-hidden="true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">

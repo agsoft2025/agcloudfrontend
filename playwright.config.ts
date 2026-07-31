@@ -47,6 +47,31 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /calls\.livekit\.spec\.ts/,
+    },
+    {
+      /**
+       * Dedicated project for tests/e2e/calls.livekit.spec.ts — the 5 tests
+       * that require a real, reachable LiveKit deployment (see that file's
+       * header comment). Gets fake media devices + auto-granted permissions
+       * so getUserMedia()/getDisplayMedia() don't block on OS/browser
+       * pickers in headless/CI runs. Every test in the file self-skips
+       * unless RUN_LIVEKIT_E2E=1 is set, so this project is a no-op harness
+       * change otherwise.
+       */
+      name: 'chromium-livekit',
+      testMatch: /calls\.livekit\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['camera', 'microphone'],
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+            '--auto-select-desktop-capture-source=Entire screen',
+          ],
+        },
+      },
     },
   ],
 

@@ -10,13 +10,27 @@
   that target structure.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
   import { authStore } from '$lib/stores/auth.store';
   import HomeSidebar from '$lib/components/home/HomeSidebar.svelte';
-  import GlobalCallManager from '$lib/components/calls/GlobalCallManager.svelte';
+  import type { default as GlobalCallManagerType } from '$lib/components/calls/GlobalCallManager.svelte';
 
   let mobileNavOpen = false;
+
+  // Loaded lazily post-mount rather than statically imported: GlobalCallManager
+  // statically pulls in CallSession, which statically pulls in livekit-client
+  // (~120 KB gzipped) — by far the largest dependency in the app. A static
+  // import here would put the entire LiveKit SDK on the critical path for
+  // every visit to /home, even for users who never make a call. Deferring it
+  // to onMount keeps it out of the initial bundle while still having it ready
+  // within a tick or two of the page becoming interactive.
+  let GlobalCallManager: typeof GlobalCallManagerType | null = null;
+
+  onMount(async () => {
+    ({ default: GlobalCallManager } = await import('$lib/components/calls/GlobalCallManager.svelte'));
+  });
 
   $: if (browser && $authStore.isInitialized && !$authStore.isAuthenticated) {
     goto('/signin', { replaceState: true });
@@ -51,7 +65,9 @@
     </div>
   </div>
 
-  <GlobalCallManager />
+  {#if GlobalCallManager}
+    <svelte:component this={GlobalCallManager} />
+  {/if}
 {/if}
 
 <style lang="postcss">
