@@ -21,7 +21,7 @@
  */
 
 import { browser } from '$app/environment';
-import { getApps, initializeApp, type FirebaseApp } from '@firebase/app';
+import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import {
   getMessaging,
   getToken,
