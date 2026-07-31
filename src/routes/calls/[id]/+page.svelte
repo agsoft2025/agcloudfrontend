@@ -118,6 +118,7 @@
 
   function getDisplayName(c: UserProfile): string {
     if (c.displayName?.trim()) return c.displayName.trim();
+    if (!c.email) return 'Unknown';
     const local = c.email.split('@')[0];
     return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
   }
