@@ -1,4 +1,5 @@
-import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { injectAuthSession } from './helpers/auth';
 
 // ─────────────────────────────────────────────────────────────────
 // Constants
@@ -64,6 +65,20 @@ async function interceptSignIn(page: Page, email: string, statusCode = 200) {
       ),
     })
   );
+
+  // On a successful sign-in, the app follows up with `authStore.initialize()`,
+  // which calls GET /auth/me to verify the (mocked) HttpOnly cookie session.
+  // That call must be mocked too or the app treats the visitor as signed out
+  // immediately after "signing in".
+  if (statusCode === 200) {
+    await page.route(`${API_BASE}/auth/me`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockUser(email)),
+      })
+    );
+  }
 }
 
 async function interceptSignOut(page: Page) {
@@ -89,26 +104,6 @@ async function fillSignUpForm(page: Page, email: string, password: string) {
 async function fillSignInForm(page: Page, email: string, password: string) {
   await page.getByLabel('Email').fill(email);
   await page.getByRole('textbox', { name: 'Password' }).fill(password);
-}
-
-/**
- * Inject a valid auth session directly into localStorage.
- * Used to bypass the UI login flow when a test only needs to
- * start from an already-authenticated state.
- */
-async function injectAuthSession(context: BrowserContext, email: string) {
-  // Storage state must be set before navigation
-  await context.addInitScript((args: { email: string; user: string; token: string }) => {
-    localStorage.setItem('accessToken', args.token);
-    localStorage.setItem(
-      'authUser',
-      args.user
-    );
-  }, {
-    email,
-    token: 'mock.jwt.token',
-    user: JSON.stringify(mockUser(email)),
-  });
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -334,7 +329,7 @@ test.describe('Authentication Flow', () => {
   // ── 4. Sign-out ───────────────────────────────────────────────
   test.describe('Sign-out', () => {
     test('signs out and redirects to /signin', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
       await interceptSignOut(page);
 
       await page.goto('/home');
@@ -347,7 +342,7 @@ test.describe('Authentication Flow', () => {
     });
 
     test('clears localStorage tokens on sign-out', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
       await interceptSignOut(page);
 
       await page.goto('/home');
@@ -365,7 +360,7 @@ test.describe('Authentication Flow', () => {
     });
 
     test('shows the sign-in page after sign-out even if /signout API fails', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
 
       // Backend sign-out fails — session must still be cleared locally
       await page.route(`${API_BASE}/auth/signout`, (route) =>
@@ -394,7 +389,7 @@ test.describe('Authentication Flow', () => {
     });
 
     test('redirects authenticated users from /signin to /home', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
 
       await page.goto('/signin');
 
@@ -402,7 +397,7 @@ test.describe('Authentication Flow', () => {
     });
 
     test('redirects authenticated users from /signup to /home', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
 
       await page.goto('/signup');
 
@@ -453,7 +448,7 @@ test.describe('Authentication Flow', () => {
     });
 
     test('redirects authenticated "/" to /home', async ({ page, context }) => {
-      await injectAuthSession(context, email);
+      await injectAuthSession(context, { email });
 
       await page.goto('/');
 

@@ -1,31 +1,11 @@
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { injectAuthSession } from './helpers/auth';
 
 // ── Auth session injection ────────────────────────────────────────────────────
 // All tests that visit /home need an authenticated session because the route
-// guard redirects unauthenticated visitors to /signin.
-
-const MOCK_TOKEN = 'mock.jwt.token';
-
-function mockUser() {
-  return {
-    id: 'mock-user-home',
-    email: 'home-test@example.com',
-    displayName: 'Home Test User',
-    role: 'user',
-    status: 'active',
-    avatarUrl: null,
-  };
-}
-
-async function injectAuthSession(context: BrowserContext) {
-  await context.addInitScript(
-    (args: { token: string; user: string }) => {
-      localStorage.setItem('accessToken', args.token);
-      localStorage.setItem('authUser', args.user);
-    },
-    { token: MOCK_TOKEN, user: JSON.stringify(mockUser()) }
-  );
-}
+// guard redirects unauthenticated visitors to /signin. injectAuthSession()
+// mocks GET /auth/me (what authStore.initialize() actually checks) rather
+// than just seeding localStorage.
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 

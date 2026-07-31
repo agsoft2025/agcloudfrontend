@@ -89,7 +89,6 @@
     const room = await liveKitClient.connect({
       token: response.token,
       url: response.url,
-      roomOptions: { adaptiveStream: false, dynacast: false },
       connectOptions: { autoSubscribe: true }
     });
     cleanupCallEvents = bindCallEvents(room);
@@ -105,7 +104,6 @@
     videoAvailable = localTracks.some((t) => t.kind === Track.Kind.Video);
     room.remoteParticipants.forEach((p) => {
       const remoteTracks = p.getTrackPublications();
-      console.log('Remote participant', p.identity, 'tracks:', remoteTracks.map((t) => t.kind + ':' + t.source));
     });
     cleanupOneToOneEndEvents = bindOneToOneEndEvents(room);
     const finalRoomName = response.roomName || `room-${Date.now()}`;

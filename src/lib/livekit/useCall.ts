@@ -163,13 +163,28 @@ export function bindCallEvents(room: Room | null): () => void {
   }
 
   function syncRemotePublication(publication: RemoteTrackPublication, _participant: RemoteParticipant) {
-    console.log('Remote track publication changed:', {
-      participant: _participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      subscribed: publication.isSubscribed
-    });
+
+    // Mutual exclusion: if a remote participant starts screen sharing while we
+    // are also sharing, stop our local share immediately. Only one presenter
+    // can be active at a time; the remote presenter takes precedence.
+    // The explicit `room &&` guard is needed because TypeScript does not carry
+    // flow-narrowing of `room: Room | null` into nested function closures,
+    // even though the outer bindCallEvents guard guarantees it is non-null here.
+    if (
+      room &&
+      publication.source === Track.Source.ScreenShare &&
+      publication.kind === Track.Kind.Video &&
+      !publication.isMuted
+    ) {
+      const localPub = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+      if (localPub?.track && !localPub.isMuted) {
+        console.warn(
+          '[useCall] Remote participant started sharing — stopping local screen share.'
+        );
+        room.localParticipant.setScreenShareEnabled(false).catch(console.error);
+      }
+    }
+
     publication.setSubscribed(true);
     subscribeAndSyncSoon();
   }
@@ -180,12 +195,6 @@ export function bindCallEvents(room: Room | null): () => void {
     participant: RemoteParticipant
   ) {
     publication.setSubscribed(true);
-    console.log('Remote track subscribed:', {
-      participant: participant.identity,
-      kind: track.kind,
-      source: publication.source,
-      sid: publication.trackSid
-    });
     subscribeAndSyncSoon();
   }
 
@@ -194,13 +203,6 @@ export function bindCallEvents(room: Room | null): () => void {
     status: TrackPublication.SubscriptionStatus,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track subscription status changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      status
-    });
     publication.setSubscribed(true);
     subscribeAndSyncSoon();
   }
@@ -210,13 +212,6 @@ export function bindCallEvents(room: Room | null): () => void {
     status: TrackPublication.PermissionStatus,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track subscription permission changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      status
-    });
     publication.setSubscribed(true);
     subscribeAndSyncSoon();
   }
@@ -226,13 +221,6 @@ export function bindCallEvents(room: Room | null): () => void {
     streamState: Track.StreamState,
     participant: RemoteParticipant
   ) {
-    console.log('Remote track stream state changed:', {
-      participant: participant.identity,
-      kind: publication.kind,
-      source: publication.source,
-      sid: publication.trackSid,
-      streamState
-    });
     sync();
   }
 
@@ -251,7 +239,18 @@ function subscribeToRemotePublications(room: Room, qualityConfiguredSids: Set<st
       publication.setEnabled(true);
       publication.setSubscribed(true);
 
-      if (publication.kind === Track.Kind.Video) {
+      // Only configure simulcast quality hints for camera video tracks.
+      // Screen share publications are typically published as a single layer
+      // (no simulcast). Calling setVideoQuality / setVideoDimensions on them
+      // tells the SFU "I can only accept up to W×H pixels", which — when the
+      // presenter's screen is larger than those dimensions — causes the server
+      // to find no suitable simulcast layer and stall the subscription for that
+      // subscriber. Skipping these calls lets the SFU forward the single
+      // screen share layer to every subscriber unconditionally.
+      if (
+        publication.kind === Track.Kind.Video &&
+        publication.source !== Track.Source.ScreenShare
+      ) {
         const sid = publication.trackSid;
         if (!qualityConfiguredSids.has(sid)) {
           // Set quality only once per subscription to prevent stream
@@ -261,7 +260,6 @@ function subscribeToRemotePublications(room: Room, qualityConfiguredSids: Set<st
           publication.setVideoFPS(30);
           qualityConfiguredSids.add(sid);
 
-          console.log('[useCall] Video quality configured for', participant.identity, sid);
         }
       }
     });

@@ -60,6 +60,12 @@ interface CallEndedEvent {
   callId: string;
 }
 
+interface CallParticipantLeftEvent {
+  callId: string;
+  userId: string;
+  displayName: string;
+}
+
 interface CallParticipantJoinedEvent {
   callId: string;
   userId: string;
@@ -79,7 +85,6 @@ export function initCallSignaling(): void {
   isInitialized = true;
 
   socket.on('call:incoming', (data: IncomingCallEvent) => {
-    console.log('[call-signaling] call:incoming', data);
     const state = get(activeCallStore);
 
     // Always record/refresh the invitation in the persistent notification
@@ -140,12 +145,25 @@ export function initCallSignaling(): void {
     emitLifecycleEvent('call:participant-rejected', data.callId, data.userId);
   });
 
-  socket.on('presence:update', (data: PresenceUpdateEvent) => {
+  // Backend emits presence changes as typed events: USER_ONLINE | USER_OFFLINE |
+  // USER_AWAY | PRESENCE_UPDATED.  Each payload matches PresenceUpdateEvent.
+  const applyPresenceEvent = (data: PresenceUpdateEvent) => {
     presenceStore.setPresence({
       userId: data.userId,
       status: data.status,
       lastSeen: data.lastSeen
     });
+  };
+  socket.on('USER_ONLINE',       applyPresenceEvent);
+  socket.on('USER_OFFLINE',      applyPresenceEvent);
+  socket.on('USER_AWAY',         applyPresenceEvent);
+  socket.on('PRESENCE_UPDATED',  applyPresenceEvent);
+
+  // A single participant left; the meeting continues for remaining participants.
+  // The LiveKit ParticipantDisconnected room event already updates the call UI,
+  // so we only need to propagate the lifecycle event here — no store reset.
+  socket.on('call:participant-left', (data: CallParticipantLeftEvent) => {
+    emitLifecycleEvent('call:participant-left', data.callId, data.userId);
   });
 
   socket.on('call:ended', (data: CallEndedEvent) => {

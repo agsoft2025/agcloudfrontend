@@ -10,7 +10,7 @@
     <aside class="brand-panel" aria-label="Product information">
       <header class="brand-header">
         <div class="brand-logo" aria-label="{eyebrow} home">
-          <img class="brand-logo-image" src="/logo.png" alt={eyebrow} />
+          <img class="brand-logo-image" src="/logo.png" alt={eyebrow} width="477" height="312" />
         </div>
       </header>
 
@@ -71,7 +71,7 @@
       </div>
 
       <div class="brand-illustration" aria-hidden="true">
-        <img src="/authimg1.png" alt="" loading="eager" />
+        <img src="/authimg1.png" alt="" loading="eager" width="2000" height="1505" />
       </div>
     </aside>
 
@@ -79,7 +79,7 @@
       <div class="auth-card-inner">
         <div class="auth-card-topbar" aria-hidden="true"><ThemeToggle size="sm" /></div>
       <div class="mobile-brand" aria-hidden="true">
-          <img class="brand-logo-image brand-logo-image--mobile" src="/logo.png" alt="" />
+          <img class="brand-logo-image brand-logo-image--mobile" src="/logo.png" alt="" width="477" height="312" />
         </div>
 
         <header class="form-header">

@@ -18,6 +18,7 @@
     Track,
     VideoQuality,
   } from "livekit-client";
+
   import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import { fade, scale } from "svelte/transition";
   import { callStore } from "$lib/stores/call.store";
@@ -25,6 +26,7 @@
   import { getContacts } from "$lib/api/contacts.api";
   import { addParticipant, getCallApiErrorMessage } from "$lib/api/calls.api";
   import { authStore } from "$lib/stores/auth.store";
+  import { toastStore } from "$lib/stores/toast.store";
   import { callLifecycleEvents } from "$lib/realtime/call-signaling";
   import type { UserProfile } from "$lib/stores/user.store";
   import LiveKitTrack from "./LiveKitTrack.svelte";
@@ -37,6 +39,8 @@
   const dispatch = createEventDispatcher<{ endCall: void }>();
 
   let meetingRoomEl: HTMLDivElement;
+  let stageEl: HTMLElement;
+  let resizeObs: ResizeObserver | null = null;
 
   // ── Pin / layout state ─────────────────────────────
   let pinnedId: string | null = null;
@@ -74,6 +78,14 @@
     isTogglingScreenShare = true;
     controlError = "";
     try {
+      if (!isScreenSharing && remoteIsSharing) {
+        // Warn that taking over will interrupt the current presenter.
+        // The mutual-exclusion logic in useCall.ts will stop the remote share
+        // once we publish ours, but we want the local user to be aware.
+        toastStore.info(
+          `${screenSharerName ?? "Another participant"} was presenting. Taking over screen share.`,
+        );
+      }
       await liveKitClient.setScreenShareEnabled(!isScreenSharing);
       if ($callStore.room) callStore.syncRoom($callStore.room);
     } catch (e) {
@@ -130,6 +142,10 @@
   // 'rejected'  — person declined (shown briefly, then resets to allow re-invite)
   let inviteStatuses = new Map<string, "inviting" | "invited" | "rejected">();
   let rejectionResetTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Expiry timers: auto-clear "Invite Sent" if the user never joins/rejects.
+  let inviteTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  // Previous snapshot of remote participant IDs — used to detect departures.
+  let prevRemoteIds = new Set<string>();
 
   // ── Video quality profile ─────────────────────────
   type VideoQualityProfile = "auto" | "data-saver" | "hd" | "fhd";
@@ -187,6 +203,9 @@
   // ── Media toggle state ─────────────────────────────
   let isTogglingAudio = false;
   let isTogglingVideo = false;
+  /** Track which camera is active on mobile; true = front (selfie), false = rear */
+  let isFrontCamera = true;
+  let isSwitchingCamera = false;
   let controlError = "";
 
   // ── Elapsed call timer ─────────────────────────────
@@ -201,14 +220,18 @@
       );
     }, 1000);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    resizeObs = new ResizeObserver(() => recomputeGridLayout());
+    if (stageEl) { resizeObs.observe(stageEl); recomputeGridLayout(); }
   });
 
   onDestroy(() => {
     if (isRecordingCall) stopRecordingMedia();
     if (elapsedTimer) clearInterval(elapsedTimer);
     document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    resizeObs?.disconnect();
     unsubscribeCallEvents();
     rejectionResetTimers.forEach((t) => clearTimeout(t));
+    inviteTimeouts.forEach((t) => clearTimeout(t));
   });
 
   // ── Recording ──────────────────────────────────────
@@ -228,7 +251,7 @@
       });
     });
     if (tracksToRecord.length === 0) {
-      alert("No active media tracks found to record.");
+      toastStore.error("No active media tracks found to record.");
       return;
     }
     const stream = new MediaStream(tracksToRecord);
@@ -347,6 +370,28 @@
       controlError = getMediaControlError(e, "camera");
     } finally {
       isTogglingVideo = false;
+    }
+  }
+
+  /**
+   * Switch between front (selfie) and rear camera without ending the call.
+   * Only meaningful on mobile devices that have both cameras.
+   * Uses LiveKit's restartTrack() to re-acquire the camera with the new facingMode
+   * and seamlessly republish the updated stream to remote participants.
+   */
+  async function switchCamera() {
+    if (isSwitchingCamera || !isConnected || !isCameraEnabled) return;
+    isSwitchingCamera = true;
+    controlError = "";
+    const nextFacing = isFrontCamera ? "environment" : "user";
+    try {
+      await liveKitClient.setCameraFacingMode(nextFacing);
+      isFrontCamera = !isFrontCamera;
+      if ($callStore.room) callStore.syncRoom($callStore.room);
+    } catch (e) {
+      controlError = "Unable to switch camera.";
+    } finally {
+      isSwitchingCamera = false;
     }
   }
 
@@ -473,22 +518,85 @@
 
   $: isScreenSharing = Boolean(localScreenShareTrack);
 
+  // Who is currently presenting (identity string or null).
+  // Used to drive the "X is presenting" banner and the takeover warning.
+  $: screenSharerIdentity = $callStore.screenShareParticipantIdentity;
+  $: screenSharerName = (() => {
+    if (!screenSharerIdentity) return null;
+    const localId = $callStore.localParticipant?.identity;
+    if (screenSharerIdentity === localId) return 'You';
+    const remote = $callStore.remoteParticipants.find(
+      (p) => p.identity === screenSharerIdentity
+    );
+    return remote?.name ?? remote?.identity ?? screenSharerIdentity;
+  })();
+  // True when a different participant (not us) is sharing.
+  $: remoteIsSharing =
+    Boolean(screenSharerIdentity) &&
+    screenSharerIdentity !== $callStore.localParticipant?.identity;
+
   $: isConnected = $callStore.connectionState === ConnectionState.Connected;
   $: totalParticipants = allTiles.length;
-  $: gridCols =
-    totalParticipants <= 1
-      ? 1
-      : totalParticipants <= 2
-        ? 2
-        : totalParticipants <= 4
-          ? 2
-          : totalParticipants <= 9
-            ? 3
-            : 4;
-  $: gridRows = Math.ceil(totalParticipants / gridCols);
-  // True when the last tile occupies a row by itself (e.g. 3 tiles in 2 cols)
-  $: lastTileAlone =
-    totalParticipants > 1 && totalParticipants % gridCols !== 0;
+  // ── Responsive grid: Google Meet-style layout algorithm ─────────────────────
+  // gridCols / lastTileAlone are set by recomputeGridLayout(), called by both
+  // a ResizeObserver (container / viewport resize) and a reactive $: block
+  // (participant-count change). No static column table — container height matters.
+  let gridCols = 1;
+  let lastTileAlone = false;
+
+  /** Gap between tiles in px — mirrors CSS `gap: 0.625rem` at 16 px root. */
+  const GRID_GAP = 10;
+  const TILE_ASPECT = 16 / 9;
+
+  /**
+   * For each candidate column count (1…N) check whether all rows fit within
+   * the available height at 16:9 and pick the layout that maximises tile area —
+   * identical to the algorithm Google Meet uses for its video grid.
+   */
+  function computeOptimalCols(n: number, w: number, h: number): number {
+    if (n <= 1) return 1;
+    let bestCols = 1;
+    let bestArea = -Infinity;
+    for (let c = 1; c <= n; c++) {
+      const r = Math.ceil(n / c);
+      const tileW = (w - (c - 1) * GRID_GAP) / c;
+      if (tileW <= 0) continue;
+      const tileH = tileW / TILE_ASPECT;
+      const gridH = r * tileH + (r - 1) * GRID_GAP;
+      if (gridH <= h + 0.5) {          // +0.5 for floating-point tolerance
+        const area = tileW * tileH;
+        if (area > bestArea) { bestArea = area; bestCols = c; }
+      }
+    }
+    // Edge case: every layout overflows the height — fall back to max-area row.
+    if (bestArea === -Infinity) {
+      for (let c = 1; c <= n; c++) {
+        const tileW = (w - (c - 1) * GRID_GAP) / c;
+        if (tileW <= 0) continue;
+        const area = (tileW / TILE_ASPECT) * tileW;
+        if (area > bestArea) { bestArea = area; bestCols = c; }
+      }
+    }
+    return bestCols;
+  }
+
+  /** Read stage padding + client dimensions, compute optimal cols, write vars. */
+  function recomputeGridLayout() {
+    if (!stageEl) return;
+    const cs = getComputedStyle(stageEl);
+    const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const w = stageEl.clientWidth - padH;
+    const h = stageEl.clientHeight - padV;
+    if (w <= 0 || h <= 0) return;
+    const cols = computeOptimalCols(totalParticipants, w, h);
+    gridCols = cols;
+    lastTileAlone = totalParticipants > 1 && totalParticipants % cols !== 0;
+  }
+
+  // Reactive: re-run when participant count changes.
+  // ResizeObserver (onMount) handles container/viewport resizes.
+  $: if (totalParticipants >= 0 && stageEl) recomputeGridLayout();
   $: roomDisplayId = session.roomName ?? session.callId ?? "N/A";
 
   // ── Add people ──────────────────────────────────────
@@ -550,6 +658,17 @@
     try {
       await addParticipant(session.callId, userId);
       inviteStatuses = new Map(inviteStatuses).set(userId, "invited");
+      // Cancel any previous expiry timer for this user (e.g. a re-invite).
+      const prev = inviteTimeouts.get(userId);
+      if (prev) clearTimeout(prev);
+      // Auto-expire "Invite Sent" after 45 s if the user never joins or
+      // explicitly rejects.  Join / rejection cancel this timer first.
+      const t = setTimeout(() => {
+        inviteStatuses.delete(userId);
+        inviteStatuses = new Map(inviteStatuses);
+        inviteTimeouts.delete(userId);
+      }, 45_000);
+      inviteTimeouts.set(userId, t);
     } catch (e) {
       inviteStatuses.delete(userId);
       inviteStatuses = new Map(inviteStatuses);
@@ -567,6 +686,9 @@
     if (!event || event.type !== "call:participant-rejected" || !event.userId)
       return;
     const uid = event.userId;
+    // Cancel the no-show expiry timer — an explicit rejection supersedes it.
+    const inviteTimeout = inviteTimeouts.get(uid);
+    if (inviteTimeout) { clearTimeout(inviteTimeout); inviteTimeouts.delete(uid); }
     // Clear any existing reset timer for this user.
     const existing = rejectionResetTimers.get(uid);
     if (existing) clearTimeout(existing);
@@ -579,6 +701,44 @@
     }, 4000);
     rejectionResetTimers.set(uid, timer);
   });
+
+  // ── Invite-state sync with LiveKit participant list ────────────────────
+  // Re-runs whenever the set of remote participants changes.  Handles three
+  // cases that the rejection-event path cannot cover:
+  //   • User joins  → clear "Invite Sent" badge (they're already in the call)
+  //   • User leaves → clear "Invite Sent" so they become re-invitable
+  //   • User drops  → same as leaves (LiveKit removes them from the list)
+  // Only plain `let` variables are read here (no store subscriptions other
+  // than $callStore), so there is no reactive cycle risk.
+  $: {
+    const nextIds = new Set(
+      $callStore.remoteParticipants.map((p) => p.identity),
+    );
+    let changed = false;
+
+    // Participants who just joined: drop their pending invite status.
+    for (const id of nextIds) {
+      if (inviteStatuses.delete(id)) changed = true;
+      const it = inviteTimeouts.get(id);
+      if (it) { clearTimeout(it); inviteTimeouts.delete(id); }
+      const rt = rejectionResetTimers.get(id);
+      if (rt) { clearTimeout(rt); rejectionResetTimers.delete(id); }
+    }
+
+    // Participants who just left or dropped: reset so they can be re-invited.
+    for (const id of prevRemoteIds) {
+      if (!nextIds.has(id)) {
+        if (inviteStatuses.delete(id)) changed = true;
+        const it = inviteTimeouts.get(id);
+        if (it) { clearTimeout(it); inviteTimeouts.delete(id); }
+        const rt = rejectionResetTimers.get(id);
+        if (rt) { clearTimeout(rt); rejectionResetTimers.delete(id); }
+      }
+    }
+
+    if (changed) inviteStatuses = new Map(inviteStatuses);
+    prevRemoteIds = nextIds;
+  }
 </script>
 
 <!-- Full-screen meeting room overlay -->
@@ -598,7 +758,7 @@
   <!-- ── Top header bar ──────────────────────────── -->
   <header class="meeting-header">
     <div class="header-left">
-      <img class="meeting-logo" src="/logo.png" alt="AG Cloud" />
+      <img class="meeting-logo" src="/logo.png" alt="AG Cloud" width="477" height="312" />
       <div class="header-title">
         <span class="call-type-icon" aria-hidden="true">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -718,10 +878,38 @@
     class="video-stage"
     aria-label="Participants"
     class:is-spotlight={isSpotlight}
+    bind:this={stageEl}
   >
     {#if isSpotlight && pinnedTile}
       <!-- ── Spotlight layout: main tile + thumbnail strip ── -->
       <div class="spotlight-layout">
+        {#if mainIsScreenShare && screenSharerName}
+          <div class="presenter-banner" aria-live="polite">
+          <div>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M8 20h8M12 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>{screenSharerName} is presenting</span>
+          </div>
+            {#if !isScreenSharing}
+              <button
+                type="button"
+                class="presenter-stop-btn"
+                on:click={toggleScreenShare}
+                title="Share your screen instead"
+              >Share instead</button>
+            {:else}
+              <button
+                type="button"
+                class="presenter-stop-btn presenter-stop-btn--active"
+                on:click={toggleScreenShare}
+                title="Stop sharing"
+              >Stop sharing</button>
+            {/if}
+          </div>
+        {/if}
         <div class="spotlight-main" in:fade={{ duration: 220 }}>
           <ParticipantTile
             track={mainTrack}
@@ -750,6 +938,15 @@
                 in:scale={{ duration: 200, start: 0.85 }}
                 out:fade={{ duration: 150 }}
               >
+                {#if tile.screenShareTrack}
+                  <div class="thumbnail-screen-share-badge" aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2.5"/>
+                      <path d="M10 10l2-2 2 2M12 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Sharing
+                  </div>
+                {/if}
                 <ParticipantTile
                   track={tile.videoTrack}
                   name={tile.name}
@@ -773,7 +970,7 @@
       <!-- ── Grid layout: responsive grid of all participants ── -->
       <div
         class="participants-grid"
-        style="--cols: {gridCols}; --rows: {gridRows}"
+        style="--cols: {gridCols}"
         aria-label="{totalParticipants} participant{totalParticipants !== 1
           ? 's'
           : ''}"
@@ -850,7 +1047,17 @@
   {/if}
 
   <!-- ── Bottom controls bar ─────────────────────── -->
+  <!--
+    .controls-inner uses width:max-content + margin-inline:auto to fix the
+    classic justify-content:center + overflow-x:auto clipping bug:
+    When buttons overflow the bar, centering would push the start of the flex
+    content past the left viewport edge, making Mic/Camera unreachable.
+    width:max-content makes the inner as wide as its content; margin-inline:auto
+    centers it when it fits and becomes a no-op when it overflows, so scroll
+    always starts from the left (Mic visible first).
+  -->
   <div class="controls-bar" aria-label="Meeting controls">
+    <div class="controls-inner">
     <!-- Left group -->
     <div class="ctrl-group">
       <!-- Mic -->
@@ -962,6 +1169,25 @@
           </svg>
         {/if}
         <span>{isCameraEnabled ? "Cam off" : "Cam on"}</span>
+      </button>
+
+      <!-- Switch camera — only useful on mobile; hidden via CSS on desktop -->
+      <button
+        type="button"
+        class="ctrl-btn ctrl-flip"
+        disabled={!isConnected || !isCameraEnabled || isSwitchingCamera}
+        aria-label={isFrontCamera ? "Switch to rear camera" : "Switch to front camera"}
+        title={isFrontCamera ? "Use rear camera" : "Use front camera"}
+        on:click={switchCamera}
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20 7h-3.5L15 5H9L7.5 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="13" r="3" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 3l2-2 2 2M14 3l-2 2-2-2"
+            stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Flip</span>
       </button>
     </div>
 
@@ -1213,6 +1439,7 @@
         <span>{isFullscreen ? "Exit" : "Full"}</span>
       </button>
     </div>
+    </div><!-- /controls-inner -->
   </div>
 
   <!-- ── Add people modal ────────────────────────────── -->
@@ -1532,10 +1759,12 @@
   .participants-grid {
     display: grid;
     grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
-    gap: 0.5rem;
+    /* No explicit rows — tiles with aspect-ratio:16/9 set their own height.
+       align-content:center vertically centres the grid when it is shorter
+       than the stage (Google Meet style dark space above/below). */
+    gap: 0.625rem;
     inline-size: 100%;
-    block-size: 100%;
+    align-content: center;
   }
 
   /* Single participant: cap width so the tile doesn't stretch too wide */
@@ -1544,15 +1773,16 @@
     margin-inline: auto;
   }
 
-  /* Tiles inside the grid fill their cell; aspect-ratio is enforced by the
-     cell dimensions, not by the tile itself, so nothing gets clipped. */
+  /* Tiles fill their grid-item (whose dimensions come from aspect-ratio:16/9). */
   .participants-grid :global(.tile) {
-    aspect-ratio: auto;
     inline-size: 100%;
     block-size: 100%;
   }
 
   .grid-item {
+    /* Each tile cell maintains 16:9 — mirrors the camera/content aspect ratio.
+       The tile fills this cell 100%x100%; object-fit:contain shows the full frame. */
+    aspect-ratio: 16 / 9;
     min-block-size: 0;
     min-inline-size: 0;
   }
@@ -1735,18 +1965,33 @@
   }
 
   /* ── Controls bar ────────────────────────────────── */
+  /*
+   * .controls-bar: provides background, border, and clips the scrollable inner.
+   *   No overflow here — overflow is handled by .controls-inner.
+   *
+   * .controls-inner: the scrollable flex row.
+   *   width:max-content → always exactly as wide as its buttons.
+   *   margin-inline:auto → centers it when the bar is wider (desktop).
+   *   When the bar is narrower (mobile overflow), auto margins become 0 and
+   *   content starts from the LEFT edge — Mic & Camera are the first visible
+   *   buttons, which is the correct scroll start position.
+   */
   .controls-bar {
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    padding: 0.625rem 1.5rem 0.875rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
     background: rgba(10, 15, 26, 0.92);
     border-block-start: 1px solid rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
-    overflow-x: auto;
-    scrollbar-width: thin;
+  }
+
+  .controls-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.625rem 1.5rem 0.875rem;
+    width: max-content;
+    margin-inline: auto;
   }
 
   .ctrl-group {
@@ -1832,10 +2077,6 @@
     color: #f87171;
   }
 
-  /* Disabled-feature state */
-  .ctrl-btn.ctrl-disabled-feature {
-    opacity: 0.3;
-  }
 
   /* End call — red pill, larger */
   .ctrl-btn.ctrl-end {
@@ -2163,13 +2404,6 @@
       gap: 0.375rem;
     }
 
-    /* Mobile: single column, one tile per row stacked vertically */
-    .participants-grid {
-      grid-template-columns: 1fr !important;
-      grid-template-rows: repeat(var(--count, auto), minmax(0, 1fr)) !important;
-    }
-
-    /* On mobile every tile spans its own row, so centering is irrelevant */
     .grid-item--center-last {
       grid-column: auto;
       display: block;
@@ -2179,7 +2413,8 @@
       max-inline-size: 100%;
     }
 
-    .controls-bar {
+    /* controls-inner overrides on mobile: tighter gap and padding */
+    .controls-inner {
       gap: 0.375rem;
       padding: 0.5rem 0.75rem 0.75rem;
     }
@@ -2189,6 +2424,7 @@
       padding: 0.625rem;
     }
 
+    /* Hide text labels on mobile — icons only to save space */
     .ctrl-btn span {
       display: none;
     }
@@ -2203,10 +2439,100 @@
     }
   }
 
-  /* Tablet: reduce 3-col grid to 2 cols, and recompute rows on the spot */
-  @media (max-width: 900px) {
-    .participants-grid[style*="--cols: 3"] {
-      grid-template-columns: repeat(2, 1fr) !important;
+  /* Switch-camera button: only useful on mobile (touchscreen devices with
+     multiple cameras). Hidden on desktop where facingMode is not applicable. */
+  @media (min-width: 641px) {
+    .ctrl-flip {
+      display: none;
     }
   }
+
+
+  /* ── Presenter banner (shown above spotlight when screen sharing) ── */
+  .presenter-banner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    background: rgba(78, 135, 255, 0.12);
+    border-block-end: 1px solid rgba(78, 135, 255, 0.2);
+    color: #93c5fd;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .presenter-banner svg {
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  .presenter-banner span {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .presenter-stop-btn {
+    flex-shrink: 0;
+    border: 1px solid rgba(78, 135, 255, 0.4);
+    border-radius: 999px;
+    background: rgba(78, 135, 255, 0.15);
+    color: #93c5fd;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.2rem 0.625rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 140ms ease;
+  }
+
+  .presenter-stop-btn:hover {
+    background: rgba(78, 135, 255, 0.28);
+  }
+
+  .presenter-stop-btn--active {
+    border-color: rgba(220, 38, 38, 0.4);
+    background: rgba(220, 38, 38, 0.12);
+    color: #fca5a5;
+  }
+
+  .presenter-stop-btn--active:hover {
+    background: rgba(220, 38, 38, 0.22);
+  }
+
+  /* ── Thumbnail screen-share badge ─────────────────────────────── */
+  .thumbnail-item {
+    position: relative;
+  }
+
+  .thumbnail-screen-share-badge {
+    position: absolute;
+    inset-block-start: 0.3rem;
+    inset-inline-start: 0.3rem;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(78, 135, 255, 0.75);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.375rem;
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+  }
+
+  .thumbnail-screen-share-badge svg {
+    stroke: currentColor;
+    flex-shrink: 0;
+  }
+
+
 </style>

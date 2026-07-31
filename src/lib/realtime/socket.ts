@@ -13,12 +13,12 @@ const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 let socket: Socket | null = null;
 
-/** Connect (or return the existing connection) using the current access token. */
+/** Connect (or return the existing connection) using the session cookie. */
 export function connectSocket(): Socket | null {
   if (!browser) return null;
 
-  const token = authStore.getAccessToken();
-  if (!token) return null;
+  // Only connect when a verified session exists
+  if (!authStore.getUser()) return null;
 
   if (socket) {
     if (socket.connected) return socket;
@@ -26,20 +26,19 @@ export function connectSocket(): Socket | null {
     socket = null;
   }
 
+  // withCredentials sends the HttpOnly session cookie on the handshake request.
+  // The server authenticates the connection from the cookie — no auth token needed.
   socket = io(SOCKET_URL, {
-    auth: { token },
     withCredentials: true,
     transports: ['websocket', 'polling']
   });
 
   socket.on('connect', () => {
-    console.log('[socket] connected', socket?.id);
   });
   socket.on('connect_error', (err) => {
     console.error('[socket] connect_error:', err.message);
   });
   socket.on('disconnect', (reason) => {
-    console.log('[socket] disconnected:', reason);
   });
 
   return socket;

@@ -22,6 +22,8 @@ export interface CallSummary {
   callType?: CallType;
   status?: string;
   createdAt?: string;
+  endedAt?: string;
+  updatedAt?: string;
 }
 
 export interface InitiateCallResponse {
@@ -57,7 +59,7 @@ export interface AddParticipantResponse {
   [key: string]: unknown;
 }
 
-// ── API calls ──────────────────────────────────────────────────────────────────
+// ── API calls ────────────────────────────────────────────────────────────────────────────────
 
 export async function initiateCall(payload: InitiateCallPayload): Promise<InitiateCallResponse> {
   return apiPost<InitiateCallResponse>('/calls/initiate', payload);
@@ -86,6 +88,16 @@ export async function endCall(callId: string): Promise<EndCallResponse> {
   return apiPost<EndCallResponse>(`/calls/${encodeURIComponent(callId)}/end`);
 }
 
+/**
+ * Leave an active call without ending it for remaining participants.
+ * The meeting continues; other participants receive a "call:participant-left"
+ * socket event. Use endCall() only when the caller wants to terminate the
+ * session for everyone (e.g. host ending the meeting).
+ */
+export async function leaveCall(callId: string): Promise<EndCallResponse> {
+  return apiPost<EndCallResponse>(`/calls/${encodeURIComponent(callId)}/leave`);
+}
+
 export async function startRecording(callId: string): Promise<AcceptCallResponse> {
   return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/start`);
 }
@@ -94,7 +106,7 @@ export async function stopRecording(callId: string): Promise<AcceptCallResponse>
   return apiPost<AcceptCallResponse>(`/calls/${encodeURIComponent(callId)}/record/stop`);
 }
 
-// ── Response helpers ───────────────────────────────────────────────────────────
+// ── Response helpers ──────────────────────────────────────────────────────────────────────────────────────
 
 export function getCallIdentifier(
   response: InitiateCallResponse | AcceptCallResponse | RejectCallResponse | EndCallResponse
