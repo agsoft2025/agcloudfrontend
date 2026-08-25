@@ -32,8 +32,14 @@
     ({ default: GlobalCallManager } = await import('$lib/components/calls/GlobalCallManager.svelte'));
   });
 
+  // Unauthenticated → sign in
   $: if (browser && $authStore.isInitialized && !$authStore.isAuthenticated) {
     goto('/signin', { replaceState: true });
+  }
+
+  // Admin role → admin area (keeps user flow unchanged)
+  $: if (browser && $authStore.isInitialized && $authStore.isAuthenticated && $authStore.user?.role === 'admin') {
+    goto('/admin', { replaceState: true });
   }
 </script>
 
