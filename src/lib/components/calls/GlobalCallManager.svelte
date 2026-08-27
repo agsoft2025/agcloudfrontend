@@ -37,6 +37,7 @@
   import IncomingCallOverlay from '$lib/components/molecules/IncomingCallOverlay.svelte';
   import IncomingCallNotifications from './IncomingCallNotifications.svelte';
   import CallSession, { type ActiveCallSession } from './CallSession.svelte';
+  import BillingWarningPopup from './BillingWarningPopup.svelte';
   import type { IncomingInvite } from '$lib/stores/active-call.store';
 
   let cleanupLiveKitEvents: (() => void) | null = null;
@@ -333,6 +334,9 @@
 {:else if (state.phase === 'connecting' || state.phase === 'in-call') && session}
   <CallSession {session} {isEndingCall} on:endCall={handleEndCall} />
 {/if}
+
+<!-- Billing warning popup — shown during grace period after free minutes expire -->
+<BillingWarningPopup />
 
 <style lang="postcss">
   .gcm-outgoing {

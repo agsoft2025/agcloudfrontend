@@ -9,6 +9,7 @@ import { get, writable } from 'svelte/store';
 import { connectSocket, disconnectSocket } from './socket';
 import { activeCallStore } from '$lib/stores/active-call.store';
 import { presenceStore } from '$lib/stores/presence.store';
+import { billingStore } from '$lib/stores/billing.store';
 import type { CallType } from '$lib/api/calls.api';
 
 /**
@@ -170,11 +171,22 @@ export function initCallSignaling(): void {
     const state = get(activeCallStore);
     if (state.callId === data.callId) {
       activeCallStore.reset();
+      billingStore.dismiss();
     }
     activeCallStore.markInviteEnded(data.callId);
     // Give the user a moment to see "Call Ended" before the banner disappears.
     window.setTimeout(() => activeCallStore.removeIncomingInvite(data.callId), 5000);
     emitLifecycleEvent('call:ended', data.callId);
+  });
+
+  // Billing: free minutes exhausted — show grace-period warning popup
+  socket.on('call:billing:warning', (data: { gracePeriodSeconds?: number }) => {
+    billingStore.showWarning(data?.gracePeriodSeconds);
+  });
+
+  // Billing: grace period over — backend will force-end; dismiss popup now
+  socket.on('call:billing:ended', () => {
+    billingStore.dismiss();
   });
 }
 
