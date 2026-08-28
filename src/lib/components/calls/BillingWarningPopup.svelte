@@ -38,9 +38,12 @@
       <div class="popup-body">
         <h3 class="popup-title">Free call limit reached</h3>
         <p class="popup-message">
-          Your free call limit is over. Please pay to continue.
+          {$billingStore.message}
           Call disconnects in <strong class="countdown" class:urgent={isUrgent}>{secondsLeft}s</strong>.
         </p>
+        <a href="/settings/subscription" class="subscribe-link" on:click={() => billingStore.dismiss()}>
+          View subscription plans →
+        </a>
       </div>
 
       <div class="popup-timer" aria-hidden="true">
@@ -132,6 +135,18 @@
     transition: color 300ms ease;
   }
   .countdown.urgent { color: var(--pico-del-color, #f38ba8); }
+
+  .subscribe-link {
+    display: inline-block;
+    margin-block-start: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--pico-primary, #cba6f7);
+    text-decoration: none;
+    opacity: 0.9;
+    transition: opacity 120ms ease;
+  }
+  .subscribe-link:hover { opacity: 1; text-decoration: underline; }
 
   .popup-timer {
     position: relative;

@@ -180,8 +180,8 @@ export function initCallSignaling(): void {
   });
 
   // Billing: free minutes exhausted — show grace-period warning popup
-  socket.on('call:billing:warning', (data: { gracePeriodSeconds?: number }) => {
-    billingStore.showWarning(data?.gracePeriodSeconds);
+  socket.on('call:billing:warning', (data: { gracePeriodSeconds?: number; message?: string }) => {
+    billingStore.showWarning(data?.gracePeriodSeconds, data?.message);
   });
 
   // Billing: grace period over — backend will force-end; dismiss popup now

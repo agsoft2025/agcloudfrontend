@@ -1,37 +1,42 @@
 import { writable, derived } from 'svelte/store';
 
 export interface BillingWarningState {
-  visible:            boolean;
-  graceStartedAt:     number | null;
+  visible:              boolean;
+  graceStartedAt:       number | null;
   graceDurationSeconds: number;
+  message:              string;
 }
 
-const DEFAULT_GRACE = 60;
+const DEFAULT_GRACE   = 60;
+const DEFAULT_MESSAGE = "Your free call limit is over. Please subscribe to continue.";
 
 function createBillingStore() {
   const { subscribe, set } = writable<BillingWarningState>({
     visible:              false,
     graceStartedAt:       null,
     graceDurationSeconds: DEFAULT_GRACE,
+    message:              DEFAULT_MESSAGE,
   });
 
   return {
     subscribe,
 
-    /** Show the warning popup.
-     *  @param gracePeriodSeconds  Received from the call:billing:warning socket event.
-     *                             Falls back to 60 s if not provided.
+    /**
+     * Show the warning popup.
+     * @param gracePeriodSeconds  From the call:billing:warning socket event. Defaults to 60 s.
+     * @param message             Custom warning text from the server.
      */
-    showWarning(gracePeriodSeconds = DEFAULT_GRACE) {
+    showWarning(gracePeriodSeconds = DEFAULT_GRACE, message = DEFAULT_MESSAGE) {
       set({
         visible:              true,
         graceStartedAt:       Date.now(),
         graceDurationSeconds: gracePeriodSeconds,
+        message,
       });
     },
 
     dismiss() {
-      set({ visible: false, graceStartedAt: null, graceDurationSeconds: DEFAULT_GRACE });
+      set({ visible: false, graceStartedAt: null, graceDurationSeconds: DEFAULT_GRACE, message: DEFAULT_MESSAGE });
     },
   };
 }

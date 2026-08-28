@@ -178,6 +178,20 @@
         </svelte:fragment>
       </NavItem>
 
+      <NavItem
+        label="Subscriptions"
+        description="Manage subscription plans"
+        active={currentPath.startsWith("/admin/subscriptions")}
+        on:click={() => navigate("/admin/subscriptions")}
+      >
+        <svelte:fragment slot="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M2 10h20" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </svelte:fragment>
+      </NavItem>
+
       <hr class="nav-divider" aria-hidden="true" />
       <SettingsNavItem />
     </nav>

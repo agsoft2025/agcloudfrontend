@@ -65,6 +65,14 @@
             '<rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="1.75" fill="none"/>' +
             '<path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>',
         },
+        {
+          id: 'subscription',
+          label: 'Subscription',
+          href: '/settings/subscription',
+          icon:
+            '<rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.75" fill="none"/>' +
+            '<path d="M2 10h20" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>',
+        },
       ],
     },
     {
