@@ -9,8 +9,8 @@
   import Button from '$lib/components/atoms/Button.svelte';
   import { RoomEvent, Track, type RemoteParticipant, type Room } from 'livekit-client';
   import Input from '$lib/components/atoms/Input.svelte';
+  import { ApiError } from '$lib/api/client';
   import {
-    ApiError,
     getCallApiErrorMessage,
     getCallIdentifier,
     getCall,
@@ -23,6 +23,7 @@
   import { bindCallEvents } from '$lib/livekit/useCall';
   import { liveKitClient } from '$lib/livekit/LiveKitClient';
   import { callStore } from '$lib/stores/call.store';
+  import { toastStore } from '$lib/stores/toast.store';
   import AcceptCallForm from './AcceptCallForm.svelte';
   import CallSession, { type ActiveCallSession } from './CallSession.svelte';
   import CallStatus, { type CallStatusVariant } from './CallStatus.svelte';
@@ -235,9 +236,16 @@
       }
     } catch (apiError) {
       if (apiError instanceof ApiError && apiError.status === 403) {
-        const body = apiError.body as { code?: string } | undefined;
+        const body = apiError.body as { code?: string; message?: string } | undefined;
         if (body?.code === 'FREE_CALL_EXHAUSTED') {
           showSubscribePrompt = true;
+          // Show the backend message in a toast — skip the generic inline
+          // error so the user sees a clean, actionable notification instead.
+          toastStore.error(
+            body.message ?? 'Your free call limit is over. Please subscribe to continue.',
+            6000
+          );
+          return;
         }
       }
       setStatus(getCallApiErrorMessage(apiError, 'Unable to initiate the call.'), 'error');

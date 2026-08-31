@@ -88,8 +88,20 @@ export function initCallSignaling(): void {
   socket.on('call:incoming', (data: IncomingCallEvent) => {
     const state = get(activeCallStore);
 
-    // Always record/refresh the invitation in the persistent notification
-    // queue so multiple (or re-sent) invitations are never silently dropped.
+    // If the user is already connected to (or connecting to) this exact call,
+    // suppress the invite entirely — there is nothing to join and we must not
+    // show a "Join / Dismiss" banner for a call the user is already inside.
+    const alreadyInThisCall =
+      (state.phase === 'in-call' || state.phase === 'connecting') &&
+      state.callId === data.callId;
+
+    if (alreadyInThisCall) {
+      emitLifecycleEvent('call:incoming', data.callId);
+      return;
+    }
+
+    // Record/refresh the invitation in the persistent notification queue so
+    // multiple (or re-sent) invitations are never silently dropped.
     activeCallStore.addIncomingInvite({
       callId: data.callId,
       peer: { id: data.callerId, name: data.callerName, avatarUrl: data.callerAvatar ?? null },

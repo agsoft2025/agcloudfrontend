@@ -13,7 +13,10 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { browser } from '$app/environment';
+  import { get } from 'svelte/store';
   import { authStore } from '$lib/stores/auth.store';
+  import { subscriptionStore } from '$lib/stores/subscription.store';
+  import { getMySubscription } from '$lib/api/subscription.api';
   import HomeSidebar from '$lib/components/home/HomeSidebar.svelte';
   import type { default as GlobalCallManagerType } from '$lib/components/calls/GlobalCallManager.svelte';
 
@@ -29,6 +32,23 @@
   let GlobalCallManager: typeof GlobalCallManagerType | null = null;
 
   onMount(async () => {
+    // ── Subscription fetch ── fire immediately so it runs in parallel with the
+    // GlobalCallManager import below. The call screen hides the free-minute chip
+    // until this settles, so starting it early minimises the loading window.
+    const st = get(subscriptionStore);
+    if (!st.loaded && !st.loading) {
+      subscriptionStore.setLoading();
+      getMySubscription()
+        .then((sub) => {
+          console.debug('[Subscription] /subscriptions/me →', sub);
+          subscriptionStore.setSubscription(sub);
+        })
+        .catch((err) => {
+          console.warn('[Subscription] fetch failed:', err);
+          subscriptionStore.setSubscription(null);
+        });
+    }
+
     ({ default: GlobalCallManager } = await import('$lib/components/calls/GlobalCallManager.svelte'));
   });
 

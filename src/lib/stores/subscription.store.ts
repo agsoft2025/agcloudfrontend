@@ -5,6 +5,8 @@ interface SubscriptionState {
   subscription: UserSubscription | null;
   loading: boolean;
   error: string;
+  /** True once at least one fetch has completed (success or failure). */
+  loaded: boolean;
 }
 
 function createSubscriptionStore() {
@@ -12,6 +14,7 @@ function createSubscriptionStore() {
     subscription: null,
     loading: false,
     error: '',
+    loaded: false,
   });
 
   return {
@@ -23,15 +26,15 @@ function createSubscriptionStore() {
     },
 
     setSubscription(sub: UserSubscription | null) {
-      update(() => ({ subscription: sub, loading: false, error: '' }));
+      update(() => ({ subscription: sub, loading: false, error: '', loaded: true }));
     },
 
     setError(msg: string) {
-      update((s) => ({ ...s, loading: false, error: msg }));
+      update((s) => ({ ...s, loading: false, error: msg, loaded: true }));
     },
 
     clear() {
-      set({ subscription: null, loading: false, error: '' });
+      set({ subscription: null, loading: false, error: '', loaded: false });
     },
   };
 }

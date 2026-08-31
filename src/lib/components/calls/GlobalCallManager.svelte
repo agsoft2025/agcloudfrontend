@@ -55,11 +55,22 @@
 
   $: calleeStatus = calleePresence?.status ?? 'unknown';
 
-  // Hide the banner for whichever invite is already driving the full-screen
-  // incoming-call overlay, to avoid showing duplicate UI for the same call.
-  $: bannerInvites = state.incomingInvites.filter(
-    (invite) => !(state.phase === 'incoming-ringing' && state.callId === invite.callId)
-  );
+  // Hide the banner for:
+  //   (1) the invite already shown in the full-screen incoming-call overlay, and
+  //   (2) any invite for the call the user has already joined/is connecting to —
+  //       there is no reason to offer "Join" for a call you are already inside.
+  $: bannerInvites = state.incomingInvites.filter((invite) => {
+    if (state.callId === invite.callId) {
+      if (
+        state.phase === 'incoming-ringing' ||
+        state.phase === 'connecting' ||
+        state.phase === 'in-call'
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   onMount(() => {
     if ($authStore.isAuthenticated) {
@@ -146,8 +157,11 @@
   // ── Callee actions ───────────────────────────────────────────────
   async function handleAccept() {
     if (!state.callId) return;
+    // Capture callId before any async state changes so the finally block
+    // always removes the correct invite even if the store has been reset.
+    const callId = state.callId;
     try {
-      const response = await acceptCall(state.callId);
+      const response = await acceptCall(callId);
       if (hasLiveKitCredentials(response)) {
         const liveKit = { token: response.token, roomName: response.roomName, url: response.url };
         activeCallStore.setLiveKit(liveKit);
@@ -158,6 +172,10 @@
     } catch (err) {
       activeCallStore.setError(getCallApiErrorMessage(err, 'Unable to accept the call.'));
       activeCallStore.reset();
+    } finally {
+      // Dismiss the persistent notification banner — the user has already
+      // responded (accepted or failed), so the invite must not linger.
+      activeCallStore.removeIncomingInvite(callId);
     }
   }
 

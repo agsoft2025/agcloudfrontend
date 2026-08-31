@@ -29,6 +29,7 @@
   import { toastStore } from "$lib/stores/toast.store";
   import { callLifecycleEvents } from "$lib/realtime/call-signaling";
   import { getBillingSettings } from "$lib/api/pricing.api";
+  import { subscriptionStore, hasActiveSubscription } from "$lib/stores/subscription.store";
   import type { UserProfile } from "$lib/stores/user.store";
   import LiveKitTrack from "./LiveKitTrack.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
@@ -221,8 +222,22 @@
 
   $: freeSecondsLeft = Math.max(0, freeCallSeconds - elapsedSeconds);
   $: freeMinLeft = Math.ceil(freeSecondsLeft / 60);
-  $: showFreeChip = freeSecondsLeft > 0;
+  // Hide the free-minute chip for subscribed users — the backend already skips
+  // billing timers for them, so the countdown would be misleading.
+  // Gate on `$subscriptionStore.loaded` so we never flash the chip while the
+  // subscription fetch is still in flight (it would show for subscribed users
+  // because `$hasActiveSubscription` defaults to false before data arrives).
+  $: showFreeChip = freeSecondsLeft > 0 && $subscriptionStore.loaded && !$hasActiveSubscription;
   $: freeChipUrgent = freeSecondsLeft <= 30; // last 30 s: turn orange
+
+  // Debug — remove once chip behaviour is confirmed correct in production.
+  $: console.debug(
+    '[CallSession] subscription →',
+    'loaded:', $subscriptionStore.loaded,
+    'status:', $subscriptionStore.subscription?.status ?? 'none',
+    'hasActive:', $hasActiveSubscription,
+    'showChip:', showFreeChip,
+  );
 
   onMount(() => {
     elapsedSeconds = 0;
