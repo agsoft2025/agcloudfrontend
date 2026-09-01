@@ -77,6 +77,52 @@ export async function verifyPayment(payload: {
   return data.subscription;
 }
 
+// ── Admin: enriched user list ─────────────────────────────────────────────────
+
+export interface AdminUserSubscription {
+  planName:       string;
+  durationMonths: number;
+  status:         'pending' | 'active' | 'expired' | 'cancelled';
+  startDate:      string | null;
+  endDate:        string | null;
+  amount:         number;   // INR
+  currency:       string;
+}
+
+export interface AdminUserUsage {
+  audioSeconds:     number;
+  videoSeconds:     number;
+  audioMinutes:     number;   // rounded to 2dp
+  videoMinutes:     number;
+  audioRate:        number;   // ₹/min (current active rate)
+  videoRate:        number;   // ₹/min
+  amountUsed:       number;   // ₹ spent at current rates
+  /** null when user has no subscription */
+  remainingBalance:       number | null;  // ₹
+  remainingAudioMinutes:  number | null;  // minutes of audio at current rate
+  remainingVideoMinutes:  number | null;  // minutes of video at current rate
+}
+
+export interface AdminEnrichedUser {
+  id:           string;
+  email:        string;
+  displayName:  string;
+  avatarUrl:    string | null;
+  role:         string;
+  status:       string;
+  createdAt:    string;
+  subscription: AdminUserSubscription | null;
+  usage:        AdminUserUsage;
+  freeCallUsed: boolean;
+}
+
+export async function adminGetEnrichedUsers(): Promise<AdminEnrichedUser[]> {
+  const data = await apiGet<{ users: AdminEnrichedUser[]; total: number }>(
+    '/admin/users/enriched',
+  );
+  return data.users;
+}
+
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
 export async function adminGetPlans(): Promise<SubscriptionPlan[]> {
