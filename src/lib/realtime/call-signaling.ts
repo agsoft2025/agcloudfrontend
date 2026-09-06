@@ -9,6 +9,7 @@ import { get, writable } from 'svelte/store';
 import { connectSocket, disconnectSocket } from './socket';
 import { activeCallStore } from '$lib/stores/active-call.store';
 import { presenceStore } from '$lib/stores/presence.store';
+import { billingStore } from '$lib/stores/billing.store';
 import type { CallType } from '$lib/api/calls.api';
 
 /**
@@ -87,8 +88,20 @@ export function initCallSignaling(): void {
   socket.on('call:incoming', (data: IncomingCallEvent) => {
     const state = get(activeCallStore);
 
-    // Always record/refresh the invitation in the persistent notification
-    // queue so multiple (or re-sent) invitations are never silently dropped.
+    // If the user is already connected to (or connecting to) this exact call,
+    // suppress the invite entirely — there is nothing to join and we must not
+    // show a "Join / Dismiss" banner for a call the user is already inside.
+    const alreadyInThisCall =
+      (state.phase === 'in-call' || state.phase === 'connecting') &&
+      state.callId === data.callId;
+
+    if (alreadyInThisCall) {
+      emitLifecycleEvent('call:incoming', data.callId);
+      return;
+    }
+
+    // Record/refresh the invitation in the persistent notification queue so
+    // multiple (or re-sent) invitations are never silently dropped.
     activeCallStore.addIncomingInvite({
       callId: data.callId,
       peer: { id: data.callerId, name: data.callerName, avatarUrl: data.callerAvatar ?? null },
@@ -170,11 +183,22 @@ export function initCallSignaling(): void {
     const state = get(activeCallStore);
     if (state.callId === data.callId) {
       activeCallStore.reset();
+      billingStore.dismiss();
     }
     activeCallStore.markInviteEnded(data.callId);
     // Give the user a moment to see "Call Ended" before the banner disappears.
     window.setTimeout(() => activeCallStore.removeIncomingInvite(data.callId), 5000);
     emitLifecycleEvent('call:ended', data.callId);
+  });
+
+  // Billing: free minutes exhausted — show grace-period warning popup
+  socket.on('call:billing:warning', (data: { gracePeriodSeconds?: number; message?: string }) => {
+    billingStore.showWarning(data?.gracePeriodSeconds, data?.message);
+  });
+
+  // Billing: grace period over — backend will force-end; dismiss popup now
+  socket.on('call:billing:ended', () => {
+    billingStore.dismiss();
   });
 }
 

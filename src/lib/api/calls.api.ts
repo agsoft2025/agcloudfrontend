@@ -126,6 +126,17 @@ export function hasLiveKitCredentials(
   );
 }
 
+export interface CallEligibility {
+  isSubscribed:  boolean;
+  freeCallUsed:  boolean;
+  canInitiate:   boolean;
+}
+
+/** Returns whether the current user can initiate a call. */
+export async function getCallEligibility(): Promise<CallEligibility> {
+  return apiGet<CallEligibility>('/calls/eligibility');
+}
+
 export function getCallApiErrorMessage(
   error: unknown,
   fallback = 'The call request could not be completed.'

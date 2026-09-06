@@ -28,6 +28,8 @@
   import { authStore } from "$lib/stores/auth.store";
   import { toastStore } from "$lib/stores/toast.store";
   import { callLifecycleEvents } from "$lib/realtime/call-signaling";
+  import { getBillingSettings } from "$lib/api/pricing.api";
+  import { subscriptionStore, hasActiveSubscription } from "$lib/stores/subscription.store";
   import type { UserProfile } from "$lib/stores/user.store";
   import LiveKitTrack from "./LiveKitTrack.svelte";
   import ParticipantTile from "./ParticipantTile.svelte";
@@ -211,6 +213,31 @@
   // ── Elapsed call timer ─────────────────────────────
   let elapsedSeconds = 0;
   let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Free-minute counter — loaded from admin settings (default 1 min / 60 s)
+  let freeCallSeconds = 60;
+  getBillingSettings()
+    .then((s) => { freeCallSeconds = s.freeMinutes * 60; })
+    .catch(() => { /* keep default */ });
+
+  $: freeSecondsLeft = Math.max(0, freeCallSeconds - elapsedSeconds);
+  $: freeMinLeft = Math.ceil(freeSecondsLeft / 60);
+  // Hide the free-minute chip for subscribed users — the backend already skips
+  // billing timers for them, so the countdown would be misleading.
+  // Gate on `$subscriptionStore.loaded` so we never flash the chip while the
+  // subscription fetch is still in flight (it would show for subscribed users
+  // because `$hasActiveSubscription` defaults to false before data arrives).
+  $: showFreeChip = freeSecondsLeft > 0 && $subscriptionStore.loaded && !$hasActiveSubscription;
+  $: freeChipUrgent = freeSecondsLeft <= 30; // last 30 s: turn orange
+
+  // Debug — remove once chip behaviour is confirmed correct in production.
+  $: console.debug(
+    '[CallSession] subscription →',
+    'loaded:', $subscriptionStore.loaded,
+    'status:', $subscriptionStore.subscription?.status ?? 'none',
+    'hasActive:', $hasActiveSubscription,
+    'showChip:', showFreeChip,
+  );
 
   onMount(() => {
     elapsedSeconds = 0;
@@ -817,6 +844,21 @@
         </svg>
         {formatElapsed(elapsedSeconds)}
       </div>
+      <!-- Free-minute countdown chip -->
+      {#if showFreeChip}
+        <div
+          class="free-time-chip"
+          class:urgent={freeChipUrgent}
+          aria-label="{freeMinLeft} free minute{freeMinLeft === 1 ? '' : 's'} remaining"
+          title="Free call time remaining"
+        >
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 5v3l1.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          {freeMinLeft}m free
+        </div>
+      {/if}
       <!-- Participant count -->
       <div
         class="participant-count"
@@ -1702,6 +1744,28 @@
 
   .elapsed-time {
     font-family: var(--font-mono, monospace);
+  }
+
+  /* Free-time countdown chip */
+  .free-time-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    white-space: nowrap;
+    background: rgba(203, 166, 247, 0.12);
+    border: 1px solid rgba(203, 166, 247, 0.25);
+    color: rgba(203, 166, 247, 0.85);
+    transition: background-color 300ms ease, border-color 300ms ease, color 300ms ease;
+  }
+
+  .free-time-chip.urgent {
+    background: rgba(250, 179, 135, 0.14);
+    border-color: rgba(250, 179, 135, 0.35);
+    color: rgba(250, 179, 135, 0.9);
   }
 
   /* Recording badge */

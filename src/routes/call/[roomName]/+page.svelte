@@ -19,6 +19,8 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
+  import { subscriptionStore } from '$lib/stores/subscription.store';
+  import { getMySubscription } from '$lib/api/subscription.api';
 
   import CallSession, { type ActiveCallSession } from '$lib/components/calls/CallSession.svelte';
   import IncomingCallOverlay from '$lib/components/molecules/IncomingCallOverlay.svelte';
@@ -97,6 +99,24 @@
   }
 
   onMount(() => {
+    // ── Subscription fetch ── fire BEFORE connect() so subscription status
+    // is available as early as possible. The call screen hides the free-minute
+    // chip until this settles, so starting it early minimises the loading window.
+    // Idempotent: skipped if already loaded by home/+layout.svelte.
+    const st = get(subscriptionStore);
+    if (!st.loaded && !st.loading) {
+      subscriptionStore.setLoading();
+      getMySubscription()
+        .then((sub) => {
+          console.debug('[Subscription] /subscriptions/me →', sub);
+          subscriptionStore.setSubscription(sub);
+        })
+        .catch((err) => {
+          console.warn('[Subscription] fetch failed:', err);
+          subscriptionStore.setSubscription(null);
+        });
+    }
+
     void connect();
   });
 
