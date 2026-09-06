@@ -15,9 +15,11 @@
     hasLiveKitCredentials,
     getCallApiErrorMessage
   } from '$lib/api/calls.api';
+  import { ApiError } from '$lib/api/client';
   import type { UserProfile } from '$lib/stores/user.store';
   import { activeCallStore } from '$lib/stores/active-call.store';
   import { contactsDrawerOpen } from '$lib/stores/contacts-drawer.store';
+  import { toastStore } from '$lib/stores/toast.store';
 
   let selectedContactId: string | null = null;
   let selectedContact: UserProfile | null = null;
@@ -54,6 +56,16 @@
         await goto(`/call/${encodeURIComponent(response.roomName)}`);
       }
     } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        const body = err.body as { code?: string; message?: string } | undefined;
+        if (body?.code === 'FREE_CALL_EXHAUSTED') {
+          toastStore.error(
+            body.message ?? 'Your free call limit is over. Please subscribe to continue.',
+            6000
+          );
+          return;
+        }
+      }
       console.error('[ContactDashboard] Call initiation failed:', getCallApiErrorMessage(err));
     }
   }

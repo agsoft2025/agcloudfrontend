@@ -9,6 +9,7 @@
   import Button from '$lib/components/atoms/Button.svelte';
   import { RoomEvent, Track, type RemoteParticipant, type Room } from 'livekit-client';
   import Input from '$lib/components/atoms/Input.svelte';
+  import { ApiError } from '$lib/api/client';
   import {
     getCallApiErrorMessage,
     getCallIdentifier,
@@ -22,6 +23,7 @@
   import { bindCallEvents } from '$lib/livekit/useCall';
   import { liveKitClient } from '$lib/livekit/LiveKitClient';
   import { callStore } from '$lib/stores/call.store';
+  import { toastStore } from '$lib/stores/toast.store';
   import AcceptCallForm from './AcceptCallForm.svelte';
   import CallSession, { type ActiveCallSession } from './CallSession.svelte';
   import CallStatus, { type CallStatusVariant } from './CallStatus.svelte';
@@ -36,6 +38,7 @@
   let statusVariant: CallStatusVariant = 'info';
   let isSubmitting = false;
   let isEndingCall = false;
+  let showSubscribePrompt = false;
   let activeSession: ActiveCallSession | null = null;
   let videoAvailable = true;
   let cleanupCallEvents: (() => void) | null = null;
@@ -232,6 +235,19 @@
         setStatus(`Call request sent to ${validatedReceiverIds.join(', ')}.`, 'success');
       }
     } catch (apiError) {
+      if (apiError instanceof ApiError && apiError.status === 403) {
+        const body = apiError.body as { code?: string; message?: string } | undefined;
+        if (body?.code === 'FREE_CALL_EXHAUSTED') {
+          showSubscribePrompt = true;
+          // Show the backend message in a toast — skip the generic inline
+          // error so the user sees a clean, actionable notification instead.
+          toastStore.error(
+            body.message ?? 'Your free call limit is over. Please subscribe to continue.',
+            6000
+          );
+          return;
+        }
+      }
       setStatus(getCallApiErrorMessage(apiError, 'Unable to initiate the call.'), 'error');
     } finally {
       isSubmitting = false;
@@ -383,6 +399,20 @@
       </form>
 
       <CallStatus message={statusMessage} variant={statusVariant} />
+
+      {#if showSubscribePrompt}
+        <div class="subscribe-prompt">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M2 10h20" stroke="currentColor" stroke-width="1.75"/>
+          </svg>
+          <div class="subscribe-prompt-body">
+            <strong>Free call used</strong>
+            <p>You've used your free call. Subscribe to make unlimited calls.</p>
+          </div>
+          <a href="/settings/subscription" class="subscribe-prompt-link">View plans</a>
+        </div>
+      {/if}
 
       {#if !videoAvailable}
         <div class="video-warning">
@@ -669,6 +699,50 @@
     cursor: pointer;
     accent-color: var(--color-secondary);
   }
+
+  .subscribe-prompt {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-block-start: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--pico-primary) 30%, transparent);
+    background: color-mix(in srgb, var(--pico-primary) 6%, transparent);
+    color: var(--pico-color);
+  }
+
+  .subscribe-prompt svg {
+    flex-shrink: 0;
+    color: var(--pico-primary, #cba6f7);
+  }
+
+  .subscribe-prompt-body {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .subscribe-prompt-body strong {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .subscribe-prompt-body p {
+    margin: 0;
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  .subscribe-prompt-link {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--pico-primary, #cba6f7);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .subscribe-prompt-link:hover { text-decoration: underline; }
 
   .video-warning {
     display: flex;
