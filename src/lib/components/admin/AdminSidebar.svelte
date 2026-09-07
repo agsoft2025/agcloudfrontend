@@ -192,6 +192,20 @@
         </svelte:fragment>
       </NavItem>
 
+      <NavItem
+        label="Reports"
+        description="User call & subscription history"
+        active={currentPath.startsWith("/admin/reports")}
+        on:click={() => navigate("/admin/reports")}
+      >
+        <svelte:fragment slot="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.75"/>
+            <path d="M8 17v-4M12 17v-7M16 17v-2" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </svelte:fragment>
+      </NavItem>
+
       <hr class="nav-divider" aria-hidden="true" />
       <SettingsNavItem />
     </nav>

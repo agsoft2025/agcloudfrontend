@@ -116,6 +116,88 @@ export interface AdminEnrichedUser {
   freeCallUsed: boolean;
 }
 
+// ── Admin: per-user report ────────────────────────────────────────────────
+
+export interface AdminReportReceiver {
+  userId:      string;
+  email:       string;
+  displayName: string;
+}
+
+export interface AdminReportCall {
+  id:              string;
+  callType:        'audio' | 'video';
+  callMode:        'one-to-one' | 'conference';
+  status:          string;
+  durationSeconds: number;
+  createdAt:       string | null;
+  startedAt:       string | null;
+  endedAt:         string | null;
+  callerId:        string;
+  callerEmail:     string;
+  callerName:      string;
+  receivers:       AdminReportReceiver[];
+  amountCharged:   number | null;  // null = subscribed/not billed
+}
+
+export interface AdminReportSubscription {
+  id:             string;
+  planName:       string;
+  durationMonths: number;
+  amount:         number;
+  currency:       string;
+  status:         'pending' | 'active' | 'expired' | 'cancelled';
+  startDate:      string | null;
+  endDate:        string | null;
+  createdAt:      string | null;
+}
+
+export interface AdminReportUser {
+  id:          string;
+  email:       string;
+  displayName: string;
+  avatarUrl:   string | null;
+  role:        string;
+  status:      string;
+  createdAt:   string;
+}
+
+export interface AdminUserReport {
+  user:          AdminReportUser;
+  subscriptions: AdminReportSubscription[];
+  calls:         AdminReportCall[];
+  totalCalls:    number;
+  /** Pagination */
+  page:          number;
+  limit:         number;
+  totalPages:    number;
+}
+
+export interface AdminUserExportReport {
+  user:          AdminReportUser;
+  subscriptions: AdminReportSubscription[];
+  calls:         AdminReportCall[];
+  totalCalls:    number;
+}
+
+export async function adminGetUserReport(
+  userId: string,
+  page    = 1,
+  limit   = 20,
+  callType?: string,
+  status?:   string,
+): Promise<AdminUserReport> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (callType) params.set('callType', callType);
+  if (status)   params.set('status',   status);
+  return apiGet<AdminUserReport>(`/admin/reports/user/${userId}?${params}`);
+}
+
+/** Fetches all records (no pagination) for CSV download. */
+export async function adminExportUserReport(userId: string): Promise<AdminUserExportReport> {
+  return apiGet<AdminUserExportReport>(`/admin/reports/user/${userId}/export`);
+}
+
 export async function adminGetEnrichedUsers(): Promise<AdminEnrichedUser[]> {
   const data = await apiGet<{ users: AdminEnrichedUser[]; total: number }>(
     '/admin/users/enriched',
