@@ -14,17 +14,22 @@
     onCallBack — optional callback when user presses "Call Back"
 -->
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import Avatar from '$lib/components/atoms/Avatar.svelte';
-  import Skeleton from '$lib/components/atoms/Skeleton.svelte';
-  import { getCallHistory, type CallHistoryEntry, type CallDirection } from '$lib/api/contacts.api';
-  import { authStore } from '$lib/stores/auth.store';
-  import { userStore } from '$lib/stores/user.store';
-  import { callLifecycleEvents } from '$lib/realtime/call-signaling';
-  import { activeCallStore } from '$lib/stores/active-call.store';
+  import { onMount, onDestroy } from "svelte";
+  import Avatar from "$lib/components/atoms/Avatar.svelte";
+  import Skeleton from "$lib/components/atoms/Skeleton.svelte";
+  import {
+    getCallHistory,
+    type CallHistoryEntry,
+    type CallDirection,
+  } from "$lib/api/contacts.api";
+  import { authStore } from "$lib/stores/auth.store";
+  import { userStore } from "$lib/stores/user.store";
+  import { callLifecycleEvents } from "$lib/realtime/call-signaling";
+  import { activeCallStore } from "$lib/stores/active-call.store";
 
   // ── Props ──────────────────────────────────────────────────────
-  export let onCallBack: ((entry: CallHistoryEntry) => void) | undefined = undefined;
+  export let onCallBack: ((entry: CallHistoryEntry) => void) | undefined =
+    undefined;
 
   // ── State ──────────────────────────────────────────────────────
   let calls: CallHistoryEntry[] = [];
@@ -33,7 +38,7 @@
   let now = Date.now();
 
   // ── Helpers ────────────────────────────────────────────────────
-  $: currentUserId = $authStore.user?.id ?? '';
+  $: currentUserId = $authStore.user?.id ?? "";
   $: profiles = $userStore.profiles;
 
   /** The peer (other party) user id for a call entry, relative to the current user. */
@@ -46,13 +51,15 @@
   /** Derive display name for a call entry relative to the current user. */
   function getPeerName(entry: CallHistoryEntry): string {
     const peerId = getPeerId(entry);
-    if (!peerId) return 'Unknown';
+    if (!peerId) return "Unknown";
 
     const profile = profiles.get(peerId);
     if (profile?.displayName?.trim()) return profile.displayName.trim();
     if (profile?.email) {
-      const local = profile.email.split('@')[0];
-      return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+      const local = profile.email.split("@")[0];
+      return local
+        .replace(/[._-]+/g, " ")
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
     }
     return peerId.slice(0, 8);
   }
@@ -64,46 +71,53 @@
   }
 
   /** Ensure every peer referenced in the call list has a cached profile. */
-  function hydratePeerProfiles(entries: CallHistoryEntry[]) {
+  async function hydratePeerProfiles(entries: CallHistoryEntry[]) {
     const peerIds = new Set<string>();
+
     for (const entry of entries) {
       const peerId = getPeerId(entry);
       if (peerId) peerIds.add(peerId);
     }
 
-    for (const peerId of peerIds) {
-      if (!userStore.getProfile(peerId) && !userStore.isLoading(peerId)) {
-        void userStore.hydrateProfile(peerId).catch(() => {});
-      }
-    }
+    await Promise.all(
+      [...peerIds].map(async (peerId) => {
+        if (!userStore.getProfile(peerId) && !userStore.isLoading(peerId)) {
+          try {
+            await userStore.hydrateProfile(peerId);
+          } catch {
+            // Keep fallback name if profile cannot be loaded.
+          }
+        }
+      }),
+    );
   }
 
   /** Derive call direction if not provided by the server. */
   function getDirection(entry: CallHistoryEntry): CallDirection {
     if (entry.direction) return entry.direction;
-    if (entry.status === 'missed') return 'missed';
-    return entry.callerId === currentUserId ? 'outgoing' : 'incoming';
+    if (entry.status === "missed") return "missed";
+    return entry.callerId === currentUserId ? "outgoing" : "incoming";
   }
 
   function formatTimestamp(iso?: string): string {
-    if (!iso) return '';
+    if (!iso) return "";
     const d = new Date(iso);
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
 
     if (isToday) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
 
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
 
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
   }
 
   function formatDuration(seconds?: number): string {
-    if (!seconds || seconds <= 0) return '';
+    if (!seconds || seconds <= 0) return "";
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}m ${s}s`;
@@ -112,27 +126,41 @@
   /** Live elapsed duration (seconds) for an ongoing call, ticking off `now`. */
   function liveDurationSeconds(entry: CallHistoryEntry): number | undefined {
     if (!entry.isActive || !entry.startedAt) return entry.durationSeconds;
-    return Math.max(0, Math.floor((now - new Date(entry.startedAt).getTime()) / 1000));
+    return Math.max(
+      0,
+      Math.floor((now - new Date(entry.startedAt).getTime()) / 1000),
+    );
   }
 
   /** Human-readable status label for the call history item. */
-  function getStatusLabel(entry: CallHistoryEntry, direction: CallDirection): string {
-    if (entry.isActive) return 'Call in Progress';
-    if (entry.status === 'initiated') return 'Ringing';
-    if (entry.status === 'missed' || entry.participantStatus === 'missed') return 'Missed Call';
-    if (entry.status === 'rejected' || entry.participantStatus === 'rejected') return 'Rejected';
-    return direction === 'outgoing' ? 'Outgoing' : 'Incoming';
+  function getStatusLabel(
+    entry: CallHistoryEntry,
+    direction: CallDirection,
+  ): string {
+    if (entry.isActive) return "Call in Progress";
+    if (entry.status === "initiated") return "Ringing";
+    if (entry.status === "missed" || entry.participantStatus === "missed")
+      return "Missed Call";
+    if (entry.status === "rejected" || entry.participantStatus === "rejected")
+      return "Rejected";
+    return direction === "outgoing" ? "Outgoing" : "Incoming";
   }
 
   // ── Fetch ──────────────────────────────────────────────────────
   async function load() {
     isLoading = true;
     error = null;
+
     try {
-      calls = await getCallHistory(20);
-      hydratePeerProfiles(calls);
+      const history = await getCallHistory(20);
+
+      // Load profiles before displaying the call list.
+      await hydratePeerProfiles(history);
+
+      calls = history;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Could not load call history.';
+      error =
+        err instanceof Error ? err.message : "Could not load call history.";
     } finally {
       isLoading = false;
     }
@@ -142,10 +170,14 @@
   function handleJoinCall(entry: CallHistoryEntry) {
     activeCallStore.addIncomingInvite({
       callId: entry.id,
-      peer: { id: getPeerId(entry) ?? '', name: getPeerName(entry), avatarUrl: getPeerAvatar(entry) ?? null },
-      callType: entry.callType ?? 'video',
-      callMode: entry.callMode ?? 'one-to-one',
-      reinvite: true
+      peer: {
+        id: getPeerId(entry) ?? "",
+        name: getPeerName(entry),
+        avatarUrl: getPeerAvatar(entry) ?? null,
+      },
+      callType: entry.callType ?? "video",
+      callMode: entry.callMode ?? "one-to-one",
+      reinvite: true,
     });
   }
 
@@ -183,27 +215,58 @@
   <div class="rc-body">
     {#if isLoading}
       <Skeleton variant="call-history" rows={4} />
-
     {:else if error}
       <div class="rc-empty">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="1.5"
+          />
+          <path
+            d="M12 8v4M12 16h.01"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+          />
         </svg>
         <p class="rc-empty-title">Could not load history</p>
-        <button class="rc-retry-btn" type="button" onclick={() => void load()}>Retry</button>
+        <button class="rc-retry-btn" type="button" onclick={() => void load()}
+          >Retry</button
+        >
       </div>
-
     {:else if calls.length === 0}
       <div class="rc-empty">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8"
-            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M1 1l22 22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+          <path
+            d="M1 1l22 22"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
         </svg>
         <p class="rc-empty-title">No recent calls</p>
       </div>
-
     {:else}
       <ol class="rc-list" role="list">
         {#each calls as entry (entry.id)}
@@ -213,10 +276,17 @@
           {@const ts = formatTimestamp(entry.createdAt)}
           {@const dur = formatDuration(entry.durationSeconds)}
           {@const liveDur = formatDuration(liveDurationSeconds(entry))}
-          {@const isMissed = direction === 'missed' || entry.status === 'missed' || entry.participantStatus === 'missed'}
+          {@const isMissed =
+            direction === "missed" ||
+            entry.status === "missed" ||
+            entry.participantStatus === "missed"}
           {@const statusLabel = getStatusLabel(entry, direction)}
 
-          <li class="rc-item" class:rc-item--missed={isMissed} class:rc-item--active={entry.isActive}>
+          <li
+            class="rc-item"
+            class:rc-item--missed={isMissed}
+            class:rc-item--active={entry.isActive}
+          >
             <div class="rc-item-inner">
               <!-- Avatar -->
               <div class="rc-avatar">
@@ -237,37 +307,99 @@
                     {statusLabel}
                     {#if liveDur}<span class="rc-dur">· {liveDur}</span>{/if}
                     {#if entry.participantCount && entry.participantCount > 1}
-                      <span class="rc-dur">· {entry.participantCount} participants</span>
+                      <span class="rc-dur"
+                        >· {entry.participantCount} participants</span
+                      >
                     {/if}
                   {:else if isMissed}
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Missed" role="img">
-                      <path d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-label="Missed"
+                      role="img"
+                    >
+                      <path
+                        d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
                     </svg>
                     {statusLabel}
-                  {:else if entry.status === 'rejected' || entry.participantStatus === 'rejected'}
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Rejected" role="img">
-                      <path d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  {:else if entry.status === "rejected" || entry.participantStatus === "rejected"}
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-label="Rejected"
+                      role="img"
+                    >
+                      <path
+                        d="M2.01 6.63c-.51.88-.79 1.89-.79 2.97A11.47 11.47 0 0 0 12 21.2a11.47 11.47 0 0 0 8.56-3.76M3.14 2.08 21.86 21.86"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
                     </svg>
                     {statusLabel}
-                  {:else if entry.status === 'initiated'}
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Ringing" role="img">
-                      <path d="M12 8v4l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                  {:else if entry.status === "initiated"}
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-label="Ringing"
+                      role="img"
+                    >
+                      <path
+                        d="M12 8v4l2 2"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      />
                     </svg>
                     {statusLabel}
-                  {:else if direction === 'outgoing'}
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Outgoing" role="img">
-                      <path d="M7 17L17 7M17 7H7M17 7v10"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  {:else if direction === "outgoing"}
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-label="Outgoing"
+                      role="img"
+                    >
+                      <path
+                        d="M7 17L17 7M17 7H7M17 7v10"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
                     </svg>
                     Outgoing
                     {#if dur}<span class="rc-dur">· {dur}</span>{/if}
                   {:else}
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-label="Incoming" role="img">
-                      <path d="M17 7L7 17M7 17h10M7 17V7"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      aria-label="Incoming"
+                      role="img"
+                    >
+                      <path
+                        d="M17 7L7 17M7 17h10M7 17V7"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
                     </svg>
                     Incoming
                     {#if dur}<span class="rc-dur">· {dur}</span>{/if}
@@ -285,8 +417,16 @@
                   aria-label="Join call with {peerName}"
                   onclick={() => handleJoinCall(entry)}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"
+                    />
                   </svg>
                   Join Call
                 </button>
@@ -297,8 +437,16 @@
                   aria-label="Call back {peerName}"
                   onclick={() => onCallBack?.(entry)}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 10.8a19.79 19.79 0 01-3.07-8.67A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"
+                    />
                   </svg>
                   Call Back
                 </button>
@@ -308,10 +456,16 @@
                 type="button"
                 aria-label="More options for {peerName}"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <circle cx="12" cy="12" r="1.5"/>
-                  <circle cx="19" cy="12" r="1.5"/>
-                  <circle cx="5" cy="12" r="1.5"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="19" cy="12" r="1.5" />
+                  <circle cx="5" cy="12" r="1.5" />
                 </svg>
               </button>
             </div>
@@ -325,14 +479,32 @@
   <footer class="rc-footer">
     <div class="rc-sos">
       <div class="rc-sos-icon" aria-hidden="true">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       </div>
       <span class="rc-sos-label">Emergency SOS</span>
       <button class="rc-sos-btn" type="button" aria-label="Open emergency SOS">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M9 18l6-6-6-6"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
         </svg>
       </button>
     </div>
@@ -347,7 +519,11 @@
     block-size: 100%;
     inline-size: 22rem;
     flex-shrink: 0;
-    background: color-mix(in srgb, var(--color-surface-raised) 55%, var(--color-background));
+    background: color-mix(
+      in srgb,
+      var(--color-surface-raised) 55%,
+      var(--color-background)
+    );
     border-inline-start: 1px solid var(--color-border);
   }
 
@@ -415,17 +591,29 @@
 
   .rc-item--missed {
     border-inline-start: 3px solid var(--color-error);
-    background: color-mix(in srgb, var(--color-error-bg) 60%, var(--color-surface));
+    background: color-mix(
+      in srgb,
+      var(--color-error-bg) 60%,
+      var(--color-surface)
+    );
   }
 
   .rc-item--missed:hover {
-    border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border));
+    border-color: color-mix(
+      in srgb,
+      var(--color-error) 40%,
+      var(--color-border)
+    );
     border-inline-start-color: var(--color-error);
   }
 
   .rc-item--active {
     border-inline-start: 3px solid #16a34a;
-    background: color-mix(in srgb, var(--color-success-bg) 50%, var(--color-surface));
+    background: color-mix(
+      in srgb,
+      var(--color-success-bg) 50%,
+      var(--color-surface)
+    );
   }
 
   .rc-item--active .rc-actions {
@@ -443,8 +631,13 @@
   }
 
   @keyframes rc-live-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 
   .rc-item-inner {
@@ -507,17 +700,17 @@
     color: var(--color-muted);
   }
 
-  .rc-direction[data-direction='missed'] {
+  .rc-direction[data-direction="missed"] {
     color: var(--color-error);
     font-weight: 700;
   }
 
-  .rc-direction[data-direction='outgoing'] {
+  .rc-direction[data-direction="outgoing"] {
     color: var(--color-secondary);
     font-weight: 600;
   }
 
-  .rc-direction[data-direction='incoming'] {
+  .rc-direction[data-direction="incoming"] {
     color: var(--color-success);
     font-weight: 600;
   }
@@ -558,12 +751,16 @@
     font-weight: 700;
     cursor: pointer;
     letter-spacing: -0.005em;
-    transition: background-color 120ms ease, box-shadow 120ms ease, transform 100ms ease;
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease,
+      transform 100ms ease;
   }
 
   .rc-call-back-btn:hover {
     background: color-mix(in srgb, var(--color-secondary) 16%, transparent);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-secondary) 20%, transparent);
+    box-shadow: 0 2px 8px
+      color-mix(in srgb, var(--color-secondary) 20%, transparent);
     transform: translateY(-1px);
   }
 
@@ -591,7 +788,9 @@
     font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
-    transition: background-color 120ms ease, transform 100ms ease;
+    transition:
+      background-color 120ms ease,
+      transform 100ms ease;
   }
 
   .rc-join-btn:hover {
@@ -616,7 +815,10 @@
     cursor: pointer;
     padding: 0;
     flex-shrink: 0;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease;
   }
 
   .rc-more-btn:hover {
@@ -665,7 +867,9 @@
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 140ms ease, border-color 140ms ease;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
   }
 
   .rc-retry-btn:hover {
@@ -689,11 +893,14 @@
     background: var(--color-error-bg);
     border: 1px solid var(--color-error-border);
     cursor: pointer;
-    transition: box-shadow 150ms ease, transform 120ms ease;
+    transition:
+      box-shadow 150ms ease,
+      transform 120ms ease;
   }
 
   .rc-sos:hover {
-    box-shadow: 0 2px 10px color-mix(in srgb, var(--color-error) 12%, transparent);
+    box-shadow: 0 2px 10px
+      color-mix(in srgb, var(--color-error) 12%, transparent);
     transform: translateY(-1px);
   }
 
@@ -706,7 +913,8 @@
     background: var(--color-error);
     color: #ffffff;
     flex-shrink: 0;
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-error) 35%, transparent);
+    box-shadow: 0 2px 6px
+      color-mix(in srgb, var(--color-error) 35%, transparent);
   }
 
   .rc-sos-label {

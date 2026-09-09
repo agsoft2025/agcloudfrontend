@@ -26,7 +26,7 @@
   }
 </script>
 
-<div class="room-chip" title="Room ID: {roomId}">
+<!-- <div class="room-chip" title="Room ID: {roomId}">
   <span class="room-icon" aria-hidden="true">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <rect x="1" y="4" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -71,7 +71,7 @@
       {copied ? 'Copied!' : 'Failed'}
     </span>
   {/if}
-</div>
+</div> -->
 
 <style lang="postcss">
   .room-chip {
